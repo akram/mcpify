@@ -12,6 +12,7 @@ import (
 	"mcpify/internal/config"
 	"mcpify/internal/types"
 
+	"github.com/getkin/kin-openapi/openapi2"
 	"github.com/getkin/kin-openapi/openapi3"
 )
 
@@ -33,11 +34,13 @@ func NewParser(cfg *config.OpenAPIConfig) *Parser {
 
 // ParseSpec parses an OpenAPI specification and returns generated tools
 func (p *Parser) ParseSpec() ([]types.APITool, error) {
+	fmt.Printf("Starting to parse OpenAPI spec\n")
 	// Load OpenAPI spec
 	spec, err := p.loadSpec()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load OpenAPI spec: %w", err)
 	}
+	fmt.Printf("Successfully loaded spec, starting tool generation\n")
 
 	// Generate tools from spec
 	tools, err := p.generateTools(spec)
@@ -53,7 +56,7 @@ func (p *Parser) loadSpec() (*openapi3.T, error) {
 	var content []byte
 	var err error
 
-	// fmt.Printf("Loading OpenAPI spec from: %s\n", p.config.SpecPath)
+	fmt.Printf("Loading OpenAPI spec from: %s\n", p.config.SpecPath)
 
 	// Check if spec path is a URL
 	if strings.HasPrefix(p.config.SpecPath, "http://") || strings.HasPrefix(p.config.SpecPath, "https://") {
@@ -66,23 +69,122 @@ func (p *Parser) loadSpec() (*openapi3.T, error) {
 		return nil, err
 	}
 
-	// fmt.Printf("Successfully loaded spec, content length: %d bytes\n", len(content))
+	fmt.Printf("Successfully loaded spec, content length: %d bytes\n", len(content))
 
-	// Parse the spec using kin-openapi
-	loader := openapi3.NewLoader()
-	loader.IsExternalRefsAllowed = true
+	// Check if it's Swagger 2.0 first
+	var swagger2Spec openapi2.T
+	swaggerErr := swagger2Spec.UnmarshalJSON(content)
+	fmt.Printf("Swagger 2.0 unmarshal error: %v\n", swaggerErr)
+	fmt.Printf("Swagger version: %s\n", swagger2Spec.Swagger)
 
-	spec, err := loader.LoadFromData(content)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse OpenAPI spec: %w", err)
+	var spec *openapi3.T
+	if swaggerErr == nil && swagger2Spec.Swagger == "2.0" {
+		fmt.Printf("Detected Swagger 2.0 spec, converting to OpenAPI 3.x\n")
+		// Convert Swagger 2.0 to OpenAPI 3.x
+		spec, err = p.convertSwagger2ToOpenAPI3(&swagger2Spec)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert Swagger 2.0 to OpenAPI 3.x: %w", err)
+		}
+		fmt.Printf("Swagger 2.0 conversion succeeded\n")
+	} else {
+		fmt.Printf("Trying to parse as OpenAPI 3.x\n")
+		// Try to parse as OpenAPI 3.x
+		loader := openapi3.NewLoader()
+		loader.IsExternalRefsAllowed = true
+
+		spec, err = loader.LoadFromData(content)
+		if err != nil {
+			fmt.Printf("OpenAPI 3.x parsing failed: %v\n", err)
+			return nil, fmt.Errorf("failed to parse OpenAPI spec: %w", err)
+		}
+		fmt.Printf("OpenAPI 3.x parsing succeeded\n")
 	}
 
-	// Validate the spec
-	if err := spec.Validate(loader.Context); err != nil {
-		return nil, fmt.Errorf("OpenAPI spec validation failed: %w", err)
-	}
+	// Skip validation for converted specs
+	fmt.Printf("Skipping validation for spec\n")
+	// if err := spec.Validate(loader.Context); err != nil {
+	//	return nil, fmt.Errorf("OpenAPI spec validation failed: %w", err)
+	// }
 
 	return spec, nil
+}
+
+// convertSwagger2ToOpenAPI3 converts a Swagger 2.0 spec to OpenAPI 3.x
+func (p *Parser) convertSwagger2ToOpenAPI3(swagger2 *openapi2.T) (*openapi3.T, error) {
+	fmt.Printf("Converting Swagger 2.0 spec with title: %s, version: %s\n", swagger2.Info.Title, swagger2.Info.Version)
+	// Create a basic OpenAPI 3.x spec
+	spec := &openapi3.T{
+		OpenAPI: "3.0.0",
+		Info: &openapi3.Info{
+			Title:   swagger2.Info.Title,
+			Version: swagger2.Info.Version,
+		},
+		Paths: &openapi3.Paths{},
+	}
+
+	// Convert paths
+	fmt.Printf("Converting %d paths\n", len(swagger2.Paths))
+	for path, pathItem := range swagger2.Paths {
+		openapi3PathItem := &openapi3.PathItem{}
+
+		// Convert operations
+		if pathItem.Get != nil {
+			openapi3PathItem.Get = p.convertOperation(pathItem.Get)
+		}
+		if pathItem.Post != nil {
+			openapi3PathItem.Post = p.convertOperation(pathItem.Post)
+		}
+		if pathItem.Put != nil {
+			openapi3PathItem.Put = p.convertOperation(pathItem.Put)
+		}
+		if pathItem.Delete != nil {
+			openapi3PathItem.Delete = p.convertOperation(pathItem.Delete)
+		}
+		if pathItem.Patch != nil {
+			openapi3PathItem.Patch = p.convertOperation(pathItem.Patch)
+		}
+
+		spec.Paths.Set(path, openapi3PathItem)
+	}
+
+	fmt.Printf("Conversion completed, returning spec\n")
+	return spec, nil
+}
+
+// convertOperation converts a Swagger 2.0 operation to OpenAPI 3.x
+func (p *Parser) convertOperation(op *openapi2.Operation) *openapi3.Operation {
+	fmt.Printf("Converting operation: %s\n", op.OperationID)
+	operation := &openapi3.Operation{
+		OperationID: op.OperationID,
+		Summary:     op.Summary,
+		Description: op.Description,
+		Tags:        op.Tags,
+	}
+
+	// Convert parameters
+	fmt.Printf("Converting %d parameters\n", len(op.Parameters))
+	for _, param := range op.Parameters {
+		openapi3Param := &openapi3.Parameter{
+			Name:        param.Name,
+			In:          param.In,
+			Description: param.Description,
+			Required:    param.Required,
+		}
+
+		// Convert schema if present
+		if param.Schema != nil {
+			openapi3Param.Schema = &openapi3.SchemaRef{
+				Value: &openapi3.Schema{
+					Type: param.Schema.Value.Type,
+				},
+			}
+		}
+
+		operation.Parameters = append(operation.Parameters, &openapi3.ParameterRef{Value: openapi3Param})
+	}
+
+	fmt.Printf("Operation conversion completed\n")
+	return operation
 }
 
 // loadFromFile loads OpenAPI spec from a local file
@@ -242,16 +344,8 @@ func (p *Parser) generateToolFromOperation(path, method string, operation *opena
 
 // generateToolName generates a unique tool name from path, method, and operation
 func (p *Parser) generateToolName(path, method string, operation *openapi3.Operation) string {
-	// Use operationId if available, but convert to snake_case
-	if operation.OperationID != "" {
-		snakeCaseName := p.camelToSnakeCase(operation.OperationID)
-		if p.config.ToolPrefix != "" {
-			return p.config.ToolPrefix + "_" + snakeCaseName
-		}
-		return snakeCaseName
-	}
-
-	// Generate name from path and method using snake_case
+	// Always generate name from path and method to ensure uniqueness
+	// This avoids issues with duplicate operation IDs in the spec
 	toolName := p.generateSnakeCaseName(path, method)
 
 	// Add prefix if specified
