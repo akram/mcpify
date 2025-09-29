@@ -48,6 +48,12 @@ test:
 	@echo "Running tests..."
 	go test -v ./...
 
+# Run tests with race detector
+.PHONY: test-race
+test-race:
+	@echo "Running tests with race detector..."
+	go test -v -race ./...
+
 # Run tests with coverage
 .PHONY: test-coverage
 test-coverage:
@@ -55,6 +61,18 @@ test-coverage:
 	go test -v -coverprofile=coverage.out ./...
 	go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report generated: coverage.html"
+
+# Run tests for specific package
+.PHONY: test-package
+test-package:
+	@echo "Running tests for package: $(PACKAGE)"
+	go test -v $(PACKAGE)
+
+# Run tests with short flag
+.PHONY: test-short
+test-short:
+	@echo "Running short tests..."
+	go test -v -short ./...
 
 # Run linting
 .PHONY: lint
@@ -124,6 +142,15 @@ benchmark:
 	@echo "Running benchmarks..."
 	go test -bench=. -benchmem ./...
 
+# CI/CD targets
+.PHONY: ci
+ci: deps test-race lint security
+	@echo "CI pipeline completed successfully"
+
+.PHONY: ci-test
+ci-test: deps test-race
+	@echo "CI tests completed successfully"
+
 # Show help
 .PHONY: help
 help:
@@ -131,7 +158,10 @@ help:
 	@echo "  build         - Build the binary"
 	@echo "  build-all     - Build for multiple platforms"
 	@echo "  test          - Run tests"
+	@echo "  test-race     - Run tests with race detector"
 	@echo "  test-coverage - Run tests with coverage report"
+	@echo "  test-package  - Run tests for specific package (PACKAGE=./path)"
+	@echo "  test-short    - Run short tests"
 	@echo "  lint          - Run linter"
 	@echo "  fmt           - Format code"
 	@echo "  tidy          - Tidy dependencies"
@@ -143,4 +173,6 @@ help:
 	@echo "  docs          - Generate documentation"
 	@echo "  security      - Check for security vulnerabilities"
 	@echo "  benchmark     - Run benchmark tests"
+	@echo "  ci            - Run full CI pipeline"
+	@echo "  ci-test       - Run CI tests only"
 	@echo "  help          - Show this help message"

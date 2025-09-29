@@ -1,0 +1,70 @@
+name: Local Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      test-pattern:
+        description: 'Test pattern to run (e.g., ./internal/config/...)'
+        required: false
+        default: './...'
+        type: string
+      verbose:
+        description: 'Run tests in verbose mode'
+        required: false
+        default: false
+        type: boolean
+      race:
+        description: 'Run tests with race detector'
+        required: false
+        default: false
+        type: boolean
+      coverage:
+        description: 'Generate coverage report'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  test:
+    name: Local Test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.23'
+        cache: true
+        
+    - name: Install dependencies
+      run: go mod download
+      
+    - name: Run tests
+      run: |
+        TEST_ARGS="${{ inputs.test-pattern }}"
+        if [ "${{ inputs.verbose }}" = "true" ]; then
+          TEST_ARGS="-v $TEST_ARGS"
+        fi
+        if [ "${{ inputs.race }}" = "true" ]; then
+          TEST_ARGS="-race $TEST_ARGS"
+        fi
+        if [ "${{ inputs.coverage }}" = "true" ]; then
+          TEST_ARGS="-coverprofile=coverage.out $TEST_ARGS"
+        fi
+        go test $TEST_ARGS
+        
+    - name: Generate coverage report
+      if: inputs.coverage == 'true'
+      run: |
+        go tool cover -html=coverage.out -o coverage.html
+        echo "Coverage report generated: coverage.html"
+        
+    - name: Upload coverage report
+      if: inputs.coverage == 'true'
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage-report
+        path: coverage.html
