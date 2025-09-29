@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="logo.png" alt="MCPify Logo" width="200">
+</div>
+
 # MCPify - Universal MCP Server for OpenAPI APIs
 
 MCPify is a universal Model Context Protocol (MCP) server that automatically converts any OpenAPI/Swagger-enabled API into MCP tools. It reads OpenAPI specification files and dynamically registers tools for each endpoint, making any REST API accessible through the MCP protocol.
@@ -284,3 +288,7 @@ Apache License 2.0 - see LICENSE file for details.
 - **Issues**: Report bugs and request features on GitHub
 - **Documentation**: Check the README and configuration examples
 - **MCP Protocol**: Learn more at [modelcontextprotocol.io](https://modelcontextprotocol.io)
+
+## About the Logo
+
+The MCPify logo features the **Macropinna microstoma**, commonly known as the barreleye fish. This deep-sea fish is known for its unique transparent head and tubular eyes that can rotate to look upward through its transparent dome. The Macropinna fish symbolizes the project's ability to "see through" API specifications and provide clear, transparent access to any OpenAPI-enabled service through the MCP protocol. Just as the Macropinna can see through its transparent head to spot prey above, MCPify provides clear visibility and access to API endpoints through its universal MCP interface.
