@@ -1,0 +1,10 @@
+server:
+  transport: "http"
+  http:
+    host: "127.0.0.1"
+    port: 8080
+
+openapi:
+  spec_path: "https://petstore3.swagger.io/api/v3/openapi.json"
+  base_url: "https://petstore3.swagger.io/api/v3"
+  tool_prefix: "petstore"
