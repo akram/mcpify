@@ -5,7 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
+	"strings"
 
 	"mcpify/internal/types"
 )
@@ -60,6 +62,15 @@ const (
 	ErrorCodeConfigurationError = -3000
 	ErrorCodeServiceUnavailable = -3001
 	ErrorCodeDependencyFailure  = -3002
+
+	// Tool execution specific errors (-4000 to -4999) → HTTP 500 Internal Server Error
+	ErrorCodeToolExecutionFailed     = -4000
+	ErrorCodeToolNetworkError        = -4001
+	ErrorCodeToolTimeoutError        = -4002
+	ErrorCodeToolAuthenticationError = -4003
+	ErrorCodeToolValidationError     = -4004
+	ErrorCodeToolSerializationError  = -4005
+	ErrorCodeToolParameterError      = -4006
 )
 
 type Server struct {
@@ -107,6 +118,71 @@ func (s *Server) RegisterTool(name string, description string, inputSchema map[s
 	}
 }
 
+// categorizeToolError analyzes an error and returns appropriate MCP error code and message
+func categorizeToolError(err error) (int, string) {
+	if err == nil {
+		return 0, ""
+	}
+
+	errStr := err.Error()
+	errLower := strings.ToLower(errStr)
+
+	// Network-related errors
+	if strings.Contains(errLower, "timeout") || strings.Contains(errLower, "deadline exceeded") {
+		return ErrorCodeToolTimeoutError, "Tool execution timed out"
+	}
+	if strings.Contains(errLower, "connection refused") || strings.Contains(errLower, "no such host") ||
+		strings.Contains(errLower, "network is unreachable") || strings.Contains(errLower, "connection reset") {
+		return ErrorCodeToolNetworkError, "Network error during tool execution"
+	}
+
+	// Authentication errors
+	if strings.Contains(errLower, "unauthorized") || strings.Contains(errLower, "authentication failed") ||
+		strings.Contains(errLower, "invalid credentials") || strings.Contains(errLower, "token expired") ||
+		strings.Contains(errLower, "forbidden") || strings.Contains(errLower, "access denied") {
+		return ErrorCodeToolAuthenticationError, "Authentication failed during tool execution"
+	}
+
+	// Validation errors
+	if strings.Contains(errLower, "required") && strings.Contains(errLower, "not provided") ||
+		strings.Contains(errLower, "invalid parameter") || strings.Contains(errLower, "validation failed") ||
+		strings.Contains(errLower, "invalid format") || strings.Contains(errLower, "missing required field") {
+		return ErrorCodeToolParameterError, "Invalid or missing parameters for tool execution"
+	}
+
+	// Serialization errors
+	if strings.Contains(errLower, "marshal") || strings.Contains(errLower, "unmarshal") ||
+		strings.Contains(errLower, "json") || strings.Contains(errLower, "serialization") {
+		return ErrorCodeToolSerializationError, "Data serialization error during tool execution"
+	}
+
+	// API-specific errors (HTTP status codes)
+	if strings.Contains(errLower, "status 400") || strings.Contains(errLower, "bad request") {
+		return ErrorCodeToolValidationError, "Invalid request parameters"
+	}
+	if strings.Contains(errLower, "status 401") {
+		return ErrorCodeToolAuthenticationError, "Authentication required"
+	}
+	if strings.Contains(errLower, "status 403") {
+		return ErrorCodeToolAuthenticationError, "Access forbidden"
+	}
+	if strings.Contains(errLower, "status 404") {
+		return ErrorCodeToolValidationError, "Resource not found"
+	}
+	if strings.Contains(errLower, "status 422") {
+		return ErrorCodeToolValidationError, "Request validation failed"
+	}
+	if strings.Contains(errLower, "status 429") {
+		return ErrorCodeToolValidationError, "Rate limit exceeded"
+	}
+	if strings.Contains(errLower, "status 5") {
+		return ErrorCodeToolExecutionFailed, "Server error during tool execution"
+	}
+
+	// Default to generic tool execution error
+	return ErrorCodeToolExecutionFailed, "Tool execution failed"
+}
+
 func (s *Server) HandleRequest(req types.MCPRequest) types.MCPResponse {
 	response := types.MCPResponse{
 		JSONRPC: "2.0",
@@ -143,6 +219,7 @@ func (s *Server) HandleRequest(req types.MCPRequest) types.MCPResponse {
 	case "tools/call":
 		var params types.CallToolParams
 		if err := json.Unmarshal(req.Params, &params); err != nil {
+			log.Printf("Tool call parameter parsing failed - Error: %v", err)
 			response.Error = &types.MCPError{
 				Code:    ErrorCodeInvalidParams,
 				Message: "Invalid parameters",
@@ -153,6 +230,7 @@ func (s *Server) HandleRequest(req types.MCPRequest) types.MCPResponse {
 
 		handler, exists := s.tools[params.Name]
 		if !exists {
+			log.Printf("Tool not found - Tool: %s", params.Name)
 			response.Error = &types.MCPError{
 				Code:    ErrorCodeMethodNotFound,
 				Message: "Tool not found",
@@ -163,13 +241,22 @@ func (s *Server) HandleRequest(req types.MCPRequest) types.MCPResponse {
 
 		result, err := handler(params.Arguments)
 		if err != nil {
+			errorCode, errorMessage := categorizeToolError(err)
+
+			// Log the underlying error for debugging
+			log.Printf("Tool execution failed - Tool: %s, Error Code: %d, Message: %s, Details: %v",
+				params.Name, errorCode, errorMessage, err)
+
 			response.Error = &types.MCPError{
-				Code:    ErrorCodeInternalError,
-				Message: "Tool execution failed",
+				Code:    errorCode,
+				Message: errorMessage,
 				Data:    err.Error(),
 			}
 			return response
 		}
+
+		// Log successful tool execution
+		log.Printf("Tool execution successful - Tool: %s", params.Name)
 
 		resultJSON, _ := json.Marshal(result)
 		response.Result = types.CallToolResult{
@@ -181,6 +268,7 @@ func (s *Server) HandleRequest(req types.MCPRequest) types.MCPResponse {
 			},
 		}
 	default:
+		log.Printf("Unknown method requested - Method: %s", req.Method)
 		response.Error = &types.MCPError{
 			Code:    ErrorCodeMethodNotFound,
 			Message: "Method not found",

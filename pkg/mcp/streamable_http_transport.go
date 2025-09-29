@@ -363,6 +363,9 @@ func mapErrorCodeToHTTPStatus(code int) int {
 	case code >= -3999 && code <= -3000:
 		// Configuration and setup errors → HTTP 500 Internal Server Error
 		return http.StatusInternalServerError
+	case code >= -4999 && code <= -4000:
+		// Tool execution errors → HTTP 500 Internal Server Error
+		return http.StatusInternalServerError
 	default:
 		// Unknown error codes: categorize based on range
 		if code < -32768 {
