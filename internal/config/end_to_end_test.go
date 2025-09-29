@@ -89,12 +89,14 @@ openapi:
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() {
+		_ = os.Remove(tmpFile.Name())
+	}()
 
 	if _, err := tmpFile.WriteString(minimalConfig); err != nil {
 		t.Fatalf("Failed to write config: %v", err)
 	}
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	loader := NewLoader()
 	config, err := loader.Load(tmpFile.Name())
@@ -193,12 +195,14 @@ server:
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() {
+		_ = os.Remove(tmpFile.Name())
+	}()
 
 	if _, err := tmpFile.WriteString(invalidYAML); err != nil {
 		t.Fatalf("Failed to write invalid config: %v", err)
 	}
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	_, err = loader.Load(tmpFile.Name())
 	if err == nil {
@@ -219,12 +223,14 @@ server:
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile2.Name())
+	defer func() {
+		_ = os.Remove(tmpFile2.Name())
+	}()
 
 	if _, err := tmpFile2.WriteString(invalidJSON); err != nil {
 		t.Fatalf("Failed to write invalid config: %v", err)
 	}
-	tmpFile2.Close()
+	_ = tmpFile2.Close()
 
 	_, err = loader.Load(tmpFile2.Name())
 	if err == nil {
@@ -236,7 +242,9 @@ server:
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile3.Name())
+	defer func() {
+		_ = os.Remove(tmpFile3.Name())
+	}()
 
 	_, err = loader.Load(tmpFile3.Name())
 	if err == nil {

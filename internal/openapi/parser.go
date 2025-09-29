@@ -7,7 +7,6 @@ import (
 	"os"
 	"regexp"
 	"strings"
-	"unicode"
 
 	"mcpify/internal/config"
 	"mcpify/internal/types"
@@ -224,7 +223,9 @@ func (p *Parser) loadFromURL(url string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch OpenAPI spec: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to fetch OpenAPI spec: HTTP %d", resp.StatusCode)
@@ -384,28 +385,6 @@ func (p *Parser) generateSnakeCaseName(path, method string) string {
 	}
 
 	return result.String()
-}
-
-// camelToSnakeCase converts camelCase to snake_case
-func (p *Parser) camelToSnakeCase(str string) string {
-	var result strings.Builder
-	for i, r := range str {
-		if i > 0 && unicode.IsUpper(r) {
-			result.WriteString("_")
-		}
-		result.WriteRune(unicode.ToLower(r))
-	}
-	return result.String()
-}
-
-// titleCase capitalizes the first letter of a string
-func (p *Parser) titleCase(s string) string {
-	if s == "" {
-		return s
-	}
-	runes := []rune(s)
-	runes[0] = unicode.ToUpper(runes[0])
-	return string(runes)
 }
 
 // generateToolDescription generates a description for the tool

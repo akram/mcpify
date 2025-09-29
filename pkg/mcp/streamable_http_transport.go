@@ -32,7 +32,6 @@ type StreamableHTTPTransport struct {
 	config      *StreamableHTTPConfig     // Transport configuration
 	sessions    map[string]*types.Session // Active session storage
 	sessionsMux sync.RWMutex              // Mutex for thread-safe session access
-	connections int32                     // Current connection count (unused but reserved for future use)
 }
 
 // StreamableHTTPConfig contains MCP-compliant HTTP transport configuration
@@ -196,7 +195,9 @@ func (t *StreamableHTTPTransport) handlePOST(w http.ResponseWriter, r *http.Requ
 		http.Error(w, "Failed to read request body", http.StatusBadRequest)
 		return
 	}
-	defer r.Body.Close()
+	defer func() {
+		_ = r.Body.Close()
+	}()
 
 	// Step 3: Parse JSON-RPC request according to MCP specification
 	var mcpReq types.MCPRequest
@@ -270,16 +271,16 @@ func (t *StreamableHTTPTransport) writeSSEResponse(w http.ResponseWriter, respon
 		log.Printf("Failed to marshal response for session %s, event %s: %v", sessionID, eventID, err)
 		// Send error response to client
 		errorResponse := fmt.Sprintf(`{"jsonrpc":"2.0","id":%v,"error":{"code":-32603,"message":"Internal error: failed to serialize response"}}`, response.ID)
-		fmt.Fprintf(w, "id: %s\n", eventID)
-		fmt.Fprintf(w, "event: error\n")
-		fmt.Fprintf(w, "data: %s\n\n", errorResponse)
+		_, _ = fmt.Fprintf(w, "id: %s\n", eventID)
+		_, _ = fmt.Fprintf(w, "event: error\n")
+		_, _ = fmt.Fprintf(w, "data: %s\n\n", errorResponse)
 		flusher.Flush()
 		return
 	}
 
-	fmt.Fprintf(w, "id: %s\n", eventID)
-	fmt.Fprintf(w, "event: message\n")
-	fmt.Fprintf(w, "data: %s\n\n", responseJSON)
+	_, _ = fmt.Fprintf(w, "id: %s\n", eventID)
+	_, _ = fmt.Fprintf(w, "event: message\n")
+	_, _ = fmt.Fprintf(w, "data: %s\n\n", responseJSON)
 	flusher.Flush()
 }
 
@@ -298,9 +299,9 @@ func (t *StreamableHTTPTransport) setupSSEStream(w http.ResponseWriter, r *http.
 	}
 
 	// Send initial connection event
-	fmt.Fprintf(w, "id: %s\n", t.generateEventID())
-	fmt.Fprintf(w, "event: connection\n")
-	fmt.Fprintf(w, "data: {\"type\":\"connected\",\"session_id\":\"%s\"}\n\n", sessionID)
+	_, _ = fmt.Fprintf(w, "id: %s\n", t.generateEventID())
+	_, _ = fmt.Fprintf(w, "event: connection\n")
+	_, _ = fmt.Fprintf(w, "data: {\"type\":\"connected\",\"session_id\":\"%s\"}\n\n", sessionID)
 	flusher.Flush()
 
 	// Keep connection alive with periodic heartbeats
@@ -313,9 +314,9 @@ func (t *StreamableHTTPTransport) setupSSEStream(w http.ResponseWriter, r *http.
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			fmt.Fprintf(w, "id: %s\n", t.generateEventID())
-			fmt.Fprintf(w, "event: heartbeat\n")
-			fmt.Fprintf(w, "data: {\"type\":\"ping\"}\n\n")
+			_, _ = fmt.Fprintf(w, "id: %s\n", t.generateEventID())
+			_, _ = fmt.Fprintf(w, "event: heartbeat\n")
+			_, _ = fmt.Fprintf(w, "data: {\"type\":\"ping\"}\n\n")
 			flusher.Flush()
 		}
 	}
@@ -393,7 +394,7 @@ func (t *StreamableHTTPTransport) writeJSONResponse(w http.ResponseWriter, respo
 	}
 
 	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // writeErrorResponse writes a JSON-RPC error response
@@ -424,7 +425,7 @@ func (t *StreamableHTTPTransport) writeErrorResponse(w http.ResponseWriter, id i
 func (t *StreamableHTTPTransport) createSession() string {
 	// Generate 16 random bytes for cryptographically secure session ID
 	bytes := make([]byte, 16)
-	rand.Read(bytes)
+	_, _ = rand.Read(bytes)
 	sessionID := hex.EncodeToString(bytes) // Convert to hex string (32 characters)
 
 	// Store session with thread-safe access
@@ -504,7 +505,7 @@ func (t *StreamableHTTPTransport) cleanupExpiredSessions() {
 func (t *StreamableHTTPTransport) generateEventID() string {
 	// Generate 8 random bytes for a unique event ID
 	bytes := make([]byte, 8)
-	rand.Read(bytes)
+	_, _ = rand.Read(bytes)
 	// Return as 16-character hex string
 	return hex.EncodeToString(bytes)
 }

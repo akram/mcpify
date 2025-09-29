@@ -23,6 +23,7 @@ func TestLoad_EmptyPath(t *testing.T) {
 
 	if config == nil {
 		t.Error("Expected default config, got nil")
+		return
 	}
 
 	// Should return default config
@@ -56,7 +57,9 @@ func TestLoad_UnsupportedFormat(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() {
+		_ = os.Remove(tmpFile.Name())
+	}()
 
 	loader := NewLoader()
 	config, err := loader.Load(tmpFile.Name())
@@ -125,12 +128,14 @@ security:
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() {
+		_ = os.Remove(tmpFile.Name())
+	}()
 
 	if _, err := tmpFile.WriteString(yamlContent); err != nil {
 		t.Fatalf("Failed to write YAML content: %v", err)
 	}
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	loader := NewLoader()
 	config, err := loader.Load(tmpFile.Name())
@@ -141,6 +146,7 @@ security:
 
 	if config == nil {
 		t.Error("Expected config, got nil")
+		return
 	}
 
 	// Test loaded values
@@ -293,12 +299,14 @@ func TestLoad_JSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() {
+		_ = os.Remove(tmpFile.Name())
+	}()
 
 	if _, err := tmpFile.WriteString(jsonContent); err != nil {
 		t.Fatalf("Failed to write JSON content: %v", err)
 	}
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	loader := NewLoader()
 	config, err := loader.Load(tmpFile.Name())
@@ -309,6 +317,7 @@ func TestLoad_JSON(t *testing.T) {
 
 	if config == nil {
 		t.Error("Expected config, got nil")
+		return
 	}
 
 	// Test loaded values
@@ -411,7 +420,9 @@ func TestLoad_InvalidYAML(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() {
+		_ = os.Remove(tmpFile.Name())
+	}()
 
 	invalidYAML := `
 server:
@@ -423,7 +434,7 @@ server:
 	if _, err := tmpFile.WriteString(invalidYAML); err != nil {
 		t.Fatalf("Failed to write invalid YAML content: %v", err)
 	}
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	loader := NewLoader()
 	config, err := loader.Load(tmpFile.Name())
@@ -443,7 +454,9 @@ func TestLoad_InvalidJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() {
+		_ = os.Remove(tmpFile.Name())
+	}()
 
 	invalidJSON := `{
   "server": {
@@ -457,7 +470,7 @@ func TestLoad_InvalidJSON(t *testing.T) {
 	if _, err := tmpFile.WriteString(invalidJSON); err != nil {
 		t.Fatalf("Failed to write invalid JSON content: %v", err)
 	}
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	loader := NewLoader()
 	config, err := loader.Load(tmpFile.Name())

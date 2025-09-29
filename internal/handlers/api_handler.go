@@ -67,7 +67,9 @@ func (h *APIHandler) HandleAPICall(tool types.APITool, params map[string]interfa
 	if err != nil {
 		return nil, fmt.Errorf("failed to make request after %d attempts: %w", h.config.MaxRetries+1, err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	// Read response body
 	body, err := io.ReadAll(resp.Body)
