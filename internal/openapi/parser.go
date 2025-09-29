@@ -242,38 +242,37 @@ func (p *Parser) generateToolFromOperation(path, method string, operation *opena
 
 // generateToolName generates a unique tool name from path, method, and operation
 func (p *Parser) generateToolName(path, method string, operation *openapi3.Operation) string {
-	// Use operationId if available
+	// Use operationId if available, but convert to snake_case
 	if operation.OperationID != "" {
+		snakeCaseName := p.camelToSnakeCase(operation.OperationID)
 		if p.config.ToolPrefix != "" {
-			return p.config.ToolPrefix + "_" + operation.OperationID
+			return p.config.ToolPrefix + "_" + snakeCaseName
 		}
-		return operation.OperationID
+		return snakeCaseName
 	}
 
-	// Generate name from path and method
-	// Convert path to camelCase
-	pathName := p.pathToCamelCase(path)
-	methodName := strings.ToLower(method)
-
-	// Combine method and path
-	toolName := methodName + pathName
+	// Generate name from path and method using snake_case
+	toolName := p.generateSnakeCaseName(path, method)
 
 	// Add prefix if specified
 	if p.config.ToolPrefix != "" {
-		return p.config.ToolPrefix + toolName
+		return p.config.ToolPrefix + "_" + toolName
 	}
 
 	return toolName
 }
 
-// pathToCamelCase converts a path like "/user/{username}" to "UserByUsername"
-func (p *Parser) pathToCamelCase(path string) string {
+// generateSnakeCaseName generates a snake_case tool name from path and method
+func (p *Parser) generateSnakeCaseName(path, method string) string {
 	// Remove leading slash
 	path = strings.TrimPrefix(path, "/")
 
 	// Split by path segments
 	segments := strings.Split(path, "/")
 	var result strings.Builder
+
+	// Add method as first part
+	result.WriteString(strings.ToLower(method))
 
 	for _, segment := range segments {
 		if segment == "" {
@@ -283,13 +282,25 @@ func (p *Parser) pathToCamelCase(path string) string {
 		// Handle path parameters like {username}
 		if strings.HasPrefix(segment, "{") && strings.HasSuffix(segment, "}") {
 			paramName := strings.Trim(segment, "{}")
-			result.WriteString("By" + p.titleCase(paramName))
+			result.WriteString("_by_" + strings.ToLower(paramName))
 		} else {
-			// Capitalize first letter of each segment
-			result.WriteString(p.titleCase(segment))
+			// Add segment in lowercase
+			result.WriteString("_" + strings.ToLower(segment))
 		}
 	}
 
+	return result.String()
+}
+
+// camelToSnakeCase converts camelCase to snake_case
+func (p *Parser) camelToSnakeCase(str string) string {
+	var result strings.Builder
+	for i, r := range str {
+		if i > 0 && unicode.IsUpper(r) {
+			result.WriteString("_")
+		}
+		result.WriteRune(unicode.ToLower(r))
+	}
 	return result.String()
 }
 
