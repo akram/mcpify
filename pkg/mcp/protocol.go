@@ -136,6 +136,10 @@ func (s *Server) HandleRequest(req types.MCPRequest) types.MCPResponse {
 			tools = append(tools, tool)
 		}
 		response.Result = types.ListToolsResult{Tools: tools}
+	case "notifications/initialized":
+		// Handle the initialized notification - this is sent by the client after initialize
+		// According to MCP spec, this should be acknowledged but doesn't require a response
+		response.Result = map[string]interface{}{}
 	case "tools/call":
 		var params types.CallToolParams
 		if err := json.Unmarshal(req.Params, &params); err != nil {

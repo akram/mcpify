@@ -24,7 +24,7 @@ MCPify is a universal Model Context Protocol (MCP) server that automatically con
 ### Build from Source
 
 ```bash
-git clone https://github.com/mcp/mcpify.git
+git clone https://github.com/akram/mcpify.git
 cd mcpify
 go build -o mcpify ./cmd/server
 ```
