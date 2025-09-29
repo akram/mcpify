@@ -27,7 +27,7 @@ jobs:
       run: go test ./...
       
     - name: Auto-merge
-      uses: fastify/github-action-merge-dependabot@v3
+      uses: fastify/github-action-merge-dependabot@v4
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         target: minor
