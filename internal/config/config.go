@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"time"
 )
 
@@ -27,6 +28,31 @@ type HTTPConfig struct {
 	CORS           CORSConfig    `yaml:"cors" json:"cors"`
 }
 
+// UnmarshalJSON implements custom JSON unmarshaling for HTTPConfig
+func (h *HTTPConfig) UnmarshalJSON(data []byte) error {
+	type Alias HTTPConfig
+	aux := &struct {
+		SessionTimeout string `json:"session_timeout"`
+		*Alias
+	}{
+		Alias: (*Alias)(h),
+	}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	if aux.SessionTimeout != "" {
+		duration, err := time.ParseDuration(aux.SessionTimeout)
+		if err != nil {
+			return err
+		}
+		h.SessionTimeout = duration
+	}
+
+	return nil
+}
+
 // CORSConfig contains CORS configuration
 type CORSConfig struct {
 	Enabled bool     `yaml:"enabled" json:"enabled"`
@@ -51,6 +77,31 @@ type OpenAPIConfig struct {
 	ToolPrefix   string            `yaml:"tool_prefix" json:"tool_prefix"`
 	ExcludePaths []string          `yaml:"exclude_paths" json:"exclude_paths"`
 	IncludePaths []string          `yaml:"include_paths" json:"include_paths"`
+}
+
+// UnmarshalJSON implements custom JSON unmarshaling for OpenAPIConfig
+func (o *OpenAPIConfig) UnmarshalJSON(data []byte) error {
+	type Alias OpenAPIConfig
+	aux := &struct {
+		Timeout string `json:"timeout"`
+		*Alias
+	}{
+		Alias: (*Alias)(o),
+	}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	if aux.Timeout != "" {
+		duration, err := time.ParseDuration(aux.Timeout)
+		if err != nil {
+			return err
+		}
+		o.Timeout = duration
+	}
+
+	return nil
 }
 
 // AuthConfig contains authentication configuration

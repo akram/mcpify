@@ -79,7 +79,9 @@ func (l *Loader) mergeWithDefaults(config Config) Config {
 	if config.Server.HTTP.MaxConnections == 0 {
 		config.Server.HTTP.MaxConnections = defaults.Server.HTTP.MaxConnections
 	}
+	// Apply CORS defaults if not explicitly configured
 	if len(config.Server.HTTP.CORS.Origins) == 0 {
+		config.Server.HTTP.CORS.Enabled = defaults.Server.HTTP.CORS.Enabled
 		config.Server.HTTP.CORS.Origins = defaults.Server.HTTP.CORS.Origins
 	}
 
@@ -110,7 +112,10 @@ func (l *Loader) mergeWithDefaults(config Config) Config {
 	}
 
 	// Merge security config
+	// Note: For boolean fields, we can't easily detect if they were explicitly set to false
+	// So we'll always apply the default if the struct is zero-valued
 	if config.Security.RateLimiting.RequestsPerMinute == 0 {
+		config.Security.RateLimiting.Enabled = defaults.Security.RateLimiting.Enabled
 		config.Security.RateLimiting.RequestsPerMinute = defaults.Security.RateLimiting.RequestsPerMinute
 	}
 	if config.Security.RequestSizeLimit == "" {

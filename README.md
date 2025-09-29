@@ -1,9 +1,8 @@
+# MCPify - Universal MCP Server for OpenAPI APIs
+
 <div align="center">
   <img src="logo.png" alt="MCPify Logo" width="200">
 </div>
-
-# MCPify - Universal MCP Server for OpenAPI APIs
-
 MCPify is a universal Model Context Protocol (MCP) server that automatically converts any OpenAPI/Swagger-enabled API into MCP tools. It reads OpenAPI specification files and dynamically registers tools for each endpoint, making any REST API accessible through the MCP protocol.
 
 ## Features
