@@ -106,11 +106,11 @@ deps:
 	go mod download
 	go mod verify
 
-# Run the server with sample config
+# Run the server with petstore config
 .PHONY: run
 run: build
 	@echo "Running server with sample config..."
-	./$(BUILD_DIR)/$(BINARY_NAME) -config config.sample.yaml
+	./$(BUILD_DIR)/$(BINARY_NAME) -config config/samples/config.petstore.yaml
 
 # Run the server with stdio transport
 .PHONY: run-stdio

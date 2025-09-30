@@ -319,6 +319,12 @@ go test -cover ./...
 
 Apache License 2.0 - see LICENSE file for details.
 
+## Documentation
+
+- **[Dynamic Headers](docs/DYNAMIC_HEADERS.md)**: Configuration guide for dynamic header evaluation
+- **[Request Evaluator](docs/REQUEST_EVALUATOR.md)**: Advanced request evaluation and filtering
+- **[Implementation Summary](docs/IMPLEMENTATION_SUMMARY.md)**: Technical implementation details
+
 ## Support
 
 - **Issues**: Report bugs and request features on GitHub

@@ -8,7 +8,7 @@ import (
 
 func TestLoadConfig_CrossrefYAML(t *testing.T) {
 	// Test loading the actual config.crossref.yaml file
-	configPath := filepath.Join("..", "..", "config.crossref.yaml")
+	configPath := filepath.Join("..", "..", "config", "samples", "config.crossref.yaml")
 
 	loader := NewLoader()
 	config, err := loader.Load(configPath)
@@ -135,7 +135,7 @@ func TestLoadConfig_CrossrefYAML(t *testing.T) {
 
 func TestLoadConfig_MuseYAML(t *testing.T) {
 	// Test loading the actual config.muse.yaml file
-	configPath := filepath.Join("..", "..", "config.muse.yaml")
+	configPath := filepath.Join("..", "..", "config", "samples", "config.muse.yaml")
 
 	loader := NewLoader()
 	config, err := loader.Load(configPath)
@@ -192,7 +192,7 @@ func TestLoadConfig_MuseYAML(t *testing.T) {
 
 func TestLoadConfig_SampleJSON(t *testing.T) {
 	// Test loading the actual config.sample.json file
-	configPath := filepath.Join("..", "..", "config.sample.json")
+	configPath := filepath.Join("..", "..", "config", "samples", "config.sample.json")
 
 	loader := NewLoader()
 	config, err := loader.Load(configPath)
@@ -264,9 +264,9 @@ func TestLoadConfig_SampleJSON(t *testing.T) {
 func TestConfigFiles_Consistency(t *testing.T) {
 	// Test that all config files can be loaded and have consistent structure
 	configFiles := []string{
-		filepath.Join("..", "..", "config.crossref.yaml"),
-		filepath.Join("..", "..", "config.muse.yaml"),
-		filepath.Join("..", "..", "config.sample.json"),
+		filepath.Join("..", "..", "config", "samples", "config.crossref.yaml"),
+		filepath.Join("..", "..", "config", "samples", "config.muse.yaml"),
+		filepath.Join("..", "..", "config", "samples", "config.sample.json"),
 	}
 
 	loader := NewLoader()
@@ -317,19 +317,19 @@ func TestConfigFiles_AuthenticationTypes(t *testing.T) {
 		hasHeaders bool
 	}{
 		{
-			configFile: "config.crossref.yaml",
+			configFile: "config/samples/config.crossref.yaml",
 			authType:   "none",
 			hasToken:   false,
 			hasHeaders: false,
 		},
 		{
-			configFile: "config.muse.yaml",
+			configFile: "config/samples/config.muse.yaml",
 			authType:   "bearer",
 			hasToken:   true,
 			hasHeaders: true,
 		},
 		{
-			configFile: "config.sample.json",
+			configFile: "config/samples/config.sample.json",
 			authType:   "bearer",
 			hasToken:   true,
 			hasHeaders: true,
@@ -378,17 +378,17 @@ func TestConfigFiles_OpenAPISpecPaths(t *testing.T) {
 		isURL      bool
 	}{
 		{
-			configFile: "config.crossref.yaml",
+			configFile: "config/samples/config.crossref.yaml",
 			specPath:   "https://api.crossref.org/swagger-docs",
 			isURL:      true,
 		},
 		{
-			configFile: "config.muse.yaml",
+			configFile: "config/samples/config.muse.yaml",
 			specPath:   "/tmp/muses_openapi.json",
 			isURL:      false,
 		},
 		{
-			configFile: "config.sample.json",
+			configFile: "config/samples/config.sample.json",
 			specPath:   "https://api.example.com/openapi.json",
 			isURL:      true,
 		},

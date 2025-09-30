@@ -11,9 +11,9 @@ import (
 func TestEndToEnd_ConfigLoading(t *testing.T) {
 	// Test loading all provided config files
 	configFiles := []string{
-		"config.crossref.yaml",
-		"config.muse.yaml",
-		"config.sample.json",
+		"config/samples/config.crossref.yaml",
+		"config/samples/config.muse.yaml",
+		"config/samples/config.sample.json",
 	}
 
 	loader := NewLoader()
@@ -396,9 +396,9 @@ func TestEndToEnd_ValidationScenarios(t *testing.T) {
 func TestEndToEnd_ConfigRoundTrip(t *testing.T) {
 	// Test that all provided config files can be loaded, validated, and used
 	configFiles := []string{
-		"config.crossref.yaml",
-		"config.muse.yaml",
-		"config.sample.json",
+		"config/samples/config.crossref.yaml",
+		"config/samples/config.muse.yaml",
+		"config/samples/config.sample.json",
 	}
 
 	loader := NewLoader()
