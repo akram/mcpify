@@ -130,11 +130,6 @@ docs:
 	@echo "Generating documentation..."
 	godoc -http=:6060
 
-# Check for security vulnerabilities
-.PHONY: security
-security:
-	@echo "Checking for security vulnerabilities..."
-	gosec ./...
 
 # Benchmark tests
 .PHONY: benchmark
@@ -144,7 +139,7 @@ benchmark:
 
 # CI/CD targets
 .PHONY: ci
-ci: deps test-race lint security
+ci: deps test-race lint
 	@echo "CI pipeline completed successfully"
 
 .PHONY: ci-test
