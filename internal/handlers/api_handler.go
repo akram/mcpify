@@ -217,13 +217,45 @@ func (h *APIHandler) createRequest(tool types.APITool, requestURL string, params
 	var contentType string
 
 	// Handle request body for POST, PUT, PATCH methods
-	if tool.RequestBody != nil && (tool.Method == "POST" || tool.Method == "PUT" || tool.Method == "PATCH") {
+	if (tool.RequestBody != nil || hasBodyParameter(tool)) && (tool.Method == "POST" || tool.Method == "PUT" || tool.Method == "PATCH") {
 		// Look for body parameter in params
-		if bodyData, exists := params["body"]; exists {
+		// Try multiple possible parameter names for compatibility
+		var bodyData interface{}
+		var exists bool
+
+		// First try "body" (OpenAPI 3.0 style)
+		if bodyData, exists = params["body"]; !exists {
+			// Then try "request" (Swagger 2.0 style)
+			if bodyData, exists = params["request"]; !exists {
+				// Finally, look for any body parameter from the tool definition
+				for _, param := range tool.Parameters {
+					if param.In == "body" {
+						if bodyData, exists = params[param.Name]; exists {
+							break
+						}
+					}
+				}
+			}
+		}
+
+		if exists {
 			switch v := bodyData.(type) {
 			case string:
-				body = strings.NewReader(v)
-				contentType = "text/plain"
+				// Try to parse as JSON first
+				var jsonData interface{}
+				if err := json.Unmarshal([]byte(v), &jsonData); err == nil {
+					// Successfully parsed as JSON, marshal it back to ensure proper formatting
+					jsonBytes, err := json.Marshal(jsonData)
+					if err != nil {
+						return nil, fmt.Errorf("failed to marshal parsed JSON: %w", err)
+					}
+					body = bytes.NewReader(jsonBytes)
+					contentType = "application/json"
+				} else {
+					// Not valid JSON, send as plain text
+					body = strings.NewReader(v)
+					contentType = "text/plain"
+				}
 			case map[string]interface{}, []interface{}:
 				jsonData, err := json.Marshal(v)
 				if err != nil {
@@ -262,6 +294,16 @@ func (h *APIHandler) createRequest(tool types.APITool, requestURL string, params
 	}
 
 	return req, nil
+}
+
+// hasBodyParameter checks if the tool has any body parameters (Swagger 2.0 style)
+func hasBodyParameter(tool types.APITool) bool {
+	for _, param := range tool.Parameters {
+		if param.In == "body" {
+			return true
+		}
+	}
+	return false
 }
 
 // addAuthHeaders adds authentication headers to the request

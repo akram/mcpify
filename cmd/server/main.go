@@ -293,6 +293,31 @@ func generateInputSchema(tool types.APITool) map[string]interface{} {
 		}
 	}
 
+	// Handle Swagger 2.0 body parameters (parameters with in: "body")
+	// These should be treated as request body parameters
+	for _, param := range tool.Parameters {
+		if param.In == "body" {
+			// This is a body parameter from Swagger 2.0, use the parameter name
+			paramSchema := map[string]interface{}{
+				"type":        "object",
+				"description": param.Description,
+			}
+
+			// Try to use the actual schema if available
+			if param.Schema != nil {
+				if schemaMap, ok := param.Schema.(map[string]interface{}); ok {
+					paramSchema = schemaMap
+				}
+			}
+
+			properties[param.Name] = paramSchema
+
+			if param.Required {
+				required = append(required, param.Name)
+			}
+		}
+	}
+
 	finalSchema := map[string]interface{}{
 		"type":       "object",
 		"properties": properties,
