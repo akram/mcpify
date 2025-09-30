@@ -8,39 +8,58 @@ on:
 
 jobs:
   test:
-    name: Test
+    name: Run Tests
     runs-on: ubuntu-latest
     
+    strategy:
+      matrix:
+        go-version: [1.21, 1.22, 1.23]
+    
     steps:
-    - name: Checkout
+    - name: Checkout code
       uses: actions/checkout@v5
       
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
-        go-version: '1.23'
+        go-version: ${{ matrix.go-version }}
         cache: true
         
-    - name: Install dependencies
+    - name: Verify Go installation
+      run: go version
+      
+    - name: Download dependencies
       run: go mod download
       
+    - name: Verify dependencies
+      run: go mod verify
+      
     - name: Run tests
-      run: go test -v -race -coverprofile=coverage.out ./...
+      run: go test -v ./...
       
-    - name: Run tests without race (for comparison)
-      run: go test -v -coverprofile=coverage-no-race.out ./...
+    - name: Run tests with race detection
+      run: go test -v -race -coverprofile=coverage-race.out ./...
       
-    - name: Upload coverage
+    - name: Run tests with coverage
+      run: go test -v -coverprofile=coverage.out ./...
+      
+    - name: Generate coverage report
+      run: go tool cover -html=coverage.out -o coverage.html
+      
+    - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
       with:
         file: ./coverage.out
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
 
   lint:
-    name: Lint
+    name: Lint Code
     runs-on: ubuntu-latest
     
     steps:
-    - name: Checkout
+    - name: Checkout code
       uses: actions/checkout@v5
       
     - name: Set up Go
@@ -49,21 +68,44 @@ jobs:
         go-version: '1.23'
         cache: true
         
-    - name: Install dependencies
+    - name: Download dependencies
       run: go mod download
       
-    - name: Run golangci-lint
+    - name: Run go vet
+      run: go vet ./...
+      
+    - name: Run go fmt check
+      run: |
+        if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+          echo "The following files are not formatted:"
+          gofmt -s -l .
+          exit 1
+        fi
+        
+    - name: Install golangci-lint
       uses: golangci/golangci-lint-action@v8
       with:
         version: latest
+        
+    - name: Run golangci-lint
+      uses: golangci/golangci-lint-action@v8
+      with:
         args: --timeout=5m
 
   build:
     name: Build
     runs-on: ubuntu-latest
     
+    strategy:
+      matrix:
+        goos: [linux, darwin, windows]
+        goarch: [amd64, arm64]
+        exclude:
+          - goos: windows
+            goarch: arm64
+    
     steps:
-    - name: Checkout
+    - name: Checkout code
       uses: actions/checkout@v5
       
     - name: Set up Go
@@ -72,8 +114,16 @@ jobs:
         go-version: '1.23'
         cache: true
         
-    - name: Install dependencies
+    - name: Download dependencies
       run: go mod download
       
-    - name: Build
-      run: go build -v ./cmd/server
+    - name: Build binary
+      run: |
+        GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -o mcpify-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.goos == 'windows' && '.exe' || '' }} ./cmd/server
+      shell: bash
+      
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: mcpify-${{ matrix.goos }}-${{ matrix.goarch }}
+        path: mcpify-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.goos == 'windows' && '.exe' || '' }}
