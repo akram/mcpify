@@ -307,7 +307,7 @@ func Default() *Config {
 			Transport: "stdio",
 			HTTP: HTTPConfig{
 				Host:           "127.0.0.1",
-				Port:           8080,
+				Port:           9090,
 				SessionTimeout: 5 * time.Minute,
 				MaxConnections: 100,
 				CORS: CORSConfig{

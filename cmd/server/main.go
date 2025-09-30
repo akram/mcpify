@@ -7,6 +7,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"mcpify/internal/config"
 	"mcpify/internal/handlers"
@@ -20,11 +21,37 @@ import (
 )
 
 func main() {
-	// Parse command line flags
+	// Parse command line flags with combined long/short form help
 	transport := flag.String("transport", "", "Transport method (stdio, http)")
-	port := flag.Int("port", 0, "Port for HTTP transport")
+	port := flag.Int("port", 9090, "Port for HTTP transport")
 	host := flag.String("host", "", "Host for HTTP transport")
 	configPath := flag.String("config", "", "Path to configuration file")
+	specPath := flag.String("spec", "", "Path to OpenAPI specification (local file or URL)")
+
+	// Add short flag aliases
+	flag.StringVar(transport, "t", "", "Transport method (stdio, http)")
+	flag.IntVar(port, "p", 9090, "Port for HTTP transport")
+	flag.StringVar(host, "h", "", "Host for HTTP transport")
+	flag.StringVar(configPath, "c", "", "Path to configuration file")
+	flag.StringVar(specPath, "s", "", "Path to OpenAPI specification (local file or URL)")
+
+	// Customize flag usage to show both long and short forms on same line
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  -c, --config string\n")
+		fmt.Fprintf(os.Stderr, "        Path to configuration file\n")
+		fmt.Fprintf(os.Stderr, "  -h, --host string\n")
+		fmt.Fprintf(os.Stderr, "        Host for HTTP transport\n")
+		fmt.Fprintf(os.Stderr, "  -p, --port int\n")
+		fmt.Fprintf(os.Stderr, "        Port for HTTP transport (default: 9090)\n")
+		fmt.Fprintf(os.Stderr, "  -s, --spec string\n")
+		fmt.Fprintf(os.Stderr, "        Path to OpenAPI specification (local file or URL)\n")
+		fmt.Fprintf(os.Stderr, "  -t, --transport string\n")
+		fmt.Fprintf(os.Stderr, "        Transport method (stdio, http)\n")
+		fmt.Fprintf(os.Stderr, "  --help\n")
+		fmt.Fprintf(os.Stderr, "        Show this help message\n")
+	}
+
 	flag.Parse()
 
 	// Load configuration
@@ -34,15 +61,30 @@ func main() {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
 
-	// Override configuration with command line flags
+	// Override configuration with command line flags and log warnings
 	if *transport != "" {
+		if cfg.Server.Transport != "" && cfg.Server.Transport != *transport {
+			log.Printf("WARNING: Overriding config transport '%s' with command line value '%s'", cfg.Server.Transport, *transport)
+		}
 		cfg.Server.Transport = *transport
 	}
 	if *host != "" {
+		if cfg.Server.HTTP.Host != "" && cfg.Server.HTTP.Host != *host {
+			log.Printf("WARNING: Overriding config host '%s' with command line value '%s'", cfg.Server.HTTP.Host, *host)
+		}
 		cfg.Server.HTTP.Host = *host
 	}
 	if *port != 0 {
+		if cfg.Server.HTTP.Port != 0 && cfg.Server.HTTP.Port != *port {
+			log.Printf("WARNING: Overriding config port %d with command line value %d", cfg.Server.HTTP.Port, *port)
+		}
 		cfg.Server.HTTP.Port = *port
+	}
+	if *specPath != "" {
+		if cfg.OpenAPI.SpecPath != "" && cfg.OpenAPI.SpecPath != *specPath {
+			log.Printf("WARNING: Overriding config spec_path '%s' with command line value '%s'", cfg.OpenAPI.SpecPath, *specPath)
+		}
+		cfg.OpenAPI.SpecPath = *specPath
 	}
 
 	// Validate final configuration

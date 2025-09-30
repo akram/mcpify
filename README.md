@@ -41,7 +41,7 @@ server:
   transport: "http"
   http:
     host: "127.0.0.1"
-    port: 8080
+    port: 9090
 
 openapi:
   spec_path: "https://api.example.com/openapi.json"
@@ -55,10 +55,10 @@ openapi:
 2. **Run the server**:
 
 ```bash
-./mcpify -config config.yaml
+./mcpify --config config.yaml
 ```
 
-3. **Connect with an MCP client** to `http://127.0.0.1:8080/mcp`
+3. **Connect with an MCP client** to `http://127.0.0.1:9090/mcp`
 
 ## Configuration
 
@@ -69,7 +69,7 @@ server:
   transport: "http"  # "stdio" or "http"
   http:
     host: "127.0.0.1"
-    port: 8080
+    port: 9090  # Default port
     session_timeout: "5m"
     max_connections: 100
     cors:
@@ -139,14 +139,27 @@ security:
 ./mcpify [options]
 
 Options:
-  -config string
+  --config, -c string
         Path to configuration file
-  -transport string
+  --transport, -t string
         Transport method (stdio, http)
-  -host string
+  --host, -h string
         Host for HTTP transport
-  -port int
-        Port for HTTP transport
+  --port, -p int
+        Port for HTTP transport (default: 9090)
+  --spec, -s string
+        Path to OpenAPI specification (local file or URL)
+```
+
+### Command Line Precedence
+
+Command line arguments take precedence over configuration file values. When a parameter is specified both in the config file and via command line with different values, mcpify will log a warning and use the command line value.
+
+**Example:**
+```bash
+# Config file has port: 8080, but command line overrides it
+./mcpify --config config.yaml --port 9090
+# Output: WARNING: Overriding config port 8080 with command line value 9090
 ```
 
 ## Examples
@@ -165,6 +178,11 @@ openapi:
     "Accept": "application/vnd.github.v3+json"
 ```
 
+Run with:
+```bash
+./mcpify --config github-config.yaml
+```
+
 ### Example 2: Local API with Basic Auth
 
 ```yaml
@@ -176,6 +194,11 @@ openapi:
     username: "admin"
     password: "secret"
   tool_prefix: "local"
+```
+
+Run with:
+```bash
+./mcpify --config local-config.yaml
 ```
 
 ### Example 3: API with Query Parameter Authentication
@@ -190,6 +213,18 @@ openapi:
     api_key_name: "api_key"
     api_key_in: "query"
   tool_prefix: "service"
+```
+
+Run with:
+```bash
+./mcpify --config service-config.yaml
+```
+
+### Example 4: Command Line Override
+
+```bash
+# Override config file values with command line arguments
+./mcpify --config config.yaml --host 0.0.0.0 --port 8080 --spec https://api.example.com/openapi.json
 ```
 
 ## Tool Generation
