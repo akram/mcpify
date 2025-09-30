@@ -9,16 +9,16 @@ func TestDefault(t *testing.T) {
 	config := Default()
 
 	// Test server defaults
-	if config.Server.Transport != "stdio" {
-		t.Errorf("Expected default transport to be 'stdio', got '%s'", config.Server.Transport)
+	if config.Server.Transport != "http" {
+		t.Errorf("Expected default transport to be 'http', got '%s'", config.Server.Transport)
 	}
 
 	if config.Server.HTTP.Host != "127.0.0.1" {
 		t.Errorf("Expected default host to be '127.0.0.1', got '%s'", config.Server.HTTP.Host)
 	}
 
-	if config.Server.HTTP.Port != 8080 {
-		t.Errorf("Expected default port to be 8080, got %d", config.Server.HTTP.Port)
+	if config.Server.HTTP.Port != 9090 {
+		t.Errorf("Expected default port to be 9090, got %d", config.Server.HTTP.Port)
 	}
 
 	if config.Server.HTTP.SessionTimeout != 5*time.Minute {
