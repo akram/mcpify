@@ -31,7 +31,7 @@ func NewAPIHandler(cfg *config.OpenAPIConfig) *APIHandler {
 }
 
 // HandleAPICall handles an API call based on the tool configuration
-func (h *APIHandler) HandleAPICall(tool types.APITool, params map[string]interface{}) (interface{}, error) {
+func (h *APIHandler) HandleAPICall(tool types.APITool, params map[string]interface{}, headers map[string]string) (interface{}, error) {
 	// Build the request URL
 	requestURL, err := h.buildRequestURL(tool, params)
 	if err != nil {
@@ -45,11 +45,22 @@ func (h *APIHandler) HandleAPICall(tool types.APITool, params map[string]interfa
 	}
 
 	// Add authentication headers
-	h.addAuthHeaders(req)
+	h.addAuthHeaders(req, headers)
 
-	// Add custom headers
-	for key, value := range h.config.Headers {
-		req.Header.Set(key, value)
+	// Add custom headers (static and dynamic)
+	// Convert headers map to http.Header for evaluation
+	requestHeaders := make(http.Header)
+	for name, value := range headers {
+		requestHeaders.Set(name, value)
+	}
+
+	evaluatedHeaders, err := h.evaluateHeaders(h.config.Headers, requestHeaders)
+	if err != nil {
+		return nil, fmt.Errorf("failed to evaluate headers: %w", err)
+	}
+
+	for name, value := range evaluatedHeaders {
+		req.Header.Set(name, value)
 	}
 
 	// Make the request with retries
@@ -212,7 +223,7 @@ func (h *APIHandler) createRequest(tool types.APITool, requestURL string, params
 }
 
 // addAuthHeaders adds authentication headers to the request
-func (h *APIHandler) addAuthHeaders(req *http.Request) {
+func (h *APIHandler) addAuthHeaders(req *http.Request, headers map[string]string) {
 	switch h.config.Auth.Type {
 	case "bearer":
 		if h.config.Auth.Token != "" {
@@ -228,8 +239,27 @@ func (h *APIHandler) addAuthHeaders(req *http.Request) {
 		}
 	}
 
-	// Add custom auth headers
-	for key, value := range h.config.Auth.Headers {
-		req.Header.Set(key, value)
+	// Add custom auth headers (static and dynamic)
+	// Convert headers map to http.Header for evaluation
+	requestHeaders := make(http.Header)
+	for name, value := range headers {
+		requestHeaders.Set(name, value)
 	}
+
+	evaluatedAuthHeaders, err := h.evaluateHeaders(h.config.Auth.Headers, requestHeaders)
+	if err != nil {
+		// Log error but continue - don't fail the request
+		// TODO: Add proper logging
+		fmt.Printf("Warning: failed to evaluate auth headers: %v\n", err)
+	} else {
+		for name, value := range evaluatedAuthHeaders {
+			req.Header.Set(name, value)
+		}
+	}
+}
+
+// evaluateHeaders evaluates dynamic headers using the header evaluator
+func (h *APIHandler) evaluateHeaders(headers config.HeadersConfig, requestHeaders http.Header) (map[string]string, error) {
+	evaluator := config.NewHeaderEvaluator()
+	return evaluator.EvaluateHeaders(headers, requestHeaders)
 }

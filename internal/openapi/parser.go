@@ -213,9 +213,14 @@ func (p *Parser) loadFromURL(url string) ([]byte, error) {
 	// Add authentication headers
 	p.addAuthHeaders(req)
 
-	// Add custom headers
-	for key, value := range p.config.Headers {
-		req.Header.Set(key, value)
+	// Add custom headers (static and dynamic)
+	evaluatedHeaders, err := p.evaluateHeaders(p.config.Headers, req.Header)
+	if err != nil {
+		return nil, fmt.Errorf("failed to evaluate headers: %w", err)
+	}
+
+	for name, value := range evaluatedHeaders {
+		req.Header.Set(name, value)
 	}
 
 	// Make request
@@ -262,10 +267,23 @@ func (p *Parser) addAuthHeaders(req *http.Request) {
 		}
 	}
 
-	// Add custom auth headers
-	for key, value := range p.config.Auth.Headers {
-		req.Header.Set(key, value)
+	// Add custom auth headers (static and dynamic)
+	evaluatedAuthHeaders, err := p.evaluateHeaders(p.config.Auth.Headers, req.Header)
+	if err != nil {
+		// Log error but continue - don't fail the request
+		// TODO: Add proper logging
+		fmt.Printf("Warning: failed to evaluate auth headers: %v\n", err)
+	} else {
+		for name, value := range evaluatedAuthHeaders {
+			req.Header.Set(name, value)
+		}
 	}
+}
+
+// evaluateHeaders evaluates dynamic headers using the header evaluator
+func (p *Parser) evaluateHeaders(headers config.HeadersConfig, requestHeaders http.Header) (map[string]string, error) {
+	evaluator := config.NewHeaderEvaluator()
+	return evaluator.EvaluateHeaders(headers, requestHeaders)
 }
 
 // generateTools generates MCP tools from OpenAPI specification

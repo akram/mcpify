@@ -108,7 +108,7 @@ func (l *Loader) mergeWithDefaults(config Config) Config {
 		config.OpenAPI.Auth.Type = defaults.OpenAPI.Auth.Type
 	}
 	if config.OpenAPI.Headers == nil {
-		config.OpenAPI.Headers = make(map[string]string)
+		config.OpenAPI.Headers = HeadersConfig{}
 	}
 
 	// Merge security config

@@ -84,7 +84,7 @@ type ToolSchema struct {
 	InputSchema map[string]interface{}
 }
 
-type ToolHandler func(params map[string]interface{}) (interface{}, error)
+type ToolHandler func(params map[string]interface{}, headers map[string]string) (interface{}, error)
 
 // Transport defines the interface for different transport mechanisms
 type Transport interface {
@@ -183,7 +183,7 @@ func categorizeToolError(err error) (int, string) {
 	return ErrorCodeToolExecutionFailed, "Tool execution failed"
 }
 
-func (s *Server) HandleRequest(req types.MCPRequest) types.MCPResponse {
+func (s *Server) HandleRequest(req types.MCPRequest, headers map[string]string) types.MCPResponse {
 	response := types.MCPResponse{
 		JSONRPC: "2.0",
 		ID:      req.ID,
@@ -239,7 +239,7 @@ func (s *Server) HandleRequest(req types.MCPRequest) types.MCPResponse {
 			return response
 		}
 
-		result, err := handler(params.Arguments)
+		result, err := handler(params.Arguments, headers)
 		if err != nil {
 			errorCode, errorMessage := categorizeToolError(err)
 
@@ -319,7 +319,7 @@ func (st *StdioTransport) Start() error {
 			continue
 		}
 
-		response := st.server.HandleRequest(req)
+		response := st.server.HandleRequest(req, make(map[string]string))
 		st.writeResponse(response)
 	}
 

@@ -207,10 +207,18 @@ func (t *StreamableHTTPTransport) handlePOST(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Step 4: Process the request through the MCP server
-	response := t.mcpServer.HandleRequest(mcpReq)
+	// Step 4: Extract headers for dynamic header forwarding
+	headers := make(map[string]string)
+	for name, values := range r.Header {
+		if len(values) > 0 {
+			headers[name] = values[0] // Take first value
+		}
+	}
 
-	// Step 5: Choose response format based on client preferences and request type
+	// Step 5: Process the request through the MCP server
+	response := t.mcpServer.HandleRequest(mcpReq, headers)
+
+	// Step 6: Choose response format based on client preferences and request type
 	if strings.Contains(accept, "text/event-stream") && t.shouldStream(&mcpReq) {
 		// Use SSE streaming for real-time responses (e.g., long-running operations)
 		t.writeSSEResponse(w, response, sessionID)

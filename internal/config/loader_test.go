@@ -218,12 +218,12 @@ security:
 		t.Errorf("Expected auth token 'test-token', got '%s'", config.OpenAPI.Auth.Token)
 	}
 
-	if config.OpenAPI.Auth.Headers["X-Custom"] != "value" {
-		t.Errorf("Expected custom header 'value', got '%s'", config.OpenAPI.Auth.Headers["X-Custom"])
+	if config.OpenAPI.Auth.Headers.GetValue("X-Custom") != "value" {
+		t.Errorf("Expected custom header 'value', got '%s'", config.OpenAPI.Auth.Headers.GetValue("X-Custom"))
 	}
 
-	if config.OpenAPI.Headers["User-Agent"] != "Test/1.0" {
-		t.Errorf("Expected User-Agent 'Test/1.0', got '%s'", config.OpenAPI.Headers["User-Agent"])
+	if config.OpenAPI.Headers.GetValue("User-Agent") != "Test/1.0" {
+		t.Errorf("Expected User-Agent 'Test/1.0', got '%s'", config.OpenAPI.Headers.GetValue("User-Agent"))
 	}
 
 	if len(config.OpenAPI.ExcludePaths) != 2 {
@@ -389,8 +389,8 @@ func TestLoad_JSON(t *testing.T) {
 		t.Errorf("Expected API key in 'header', got '%s'", config.OpenAPI.Auth.APIKeyIn)
 	}
 
-	if config.OpenAPI.Headers["Accept"] != "application/json" {
-		t.Errorf("Expected Accept header 'application/json', got '%s'", config.OpenAPI.Headers["Accept"])
+	if config.OpenAPI.Headers.GetValue("Accept") != "application/json" {
+		t.Errorf("Expected Accept header 'application/json', got '%s'", config.OpenAPI.Headers.GetValue("Accept"))
 	}
 
 	if len(config.OpenAPI.ExcludePaths) != 2 {

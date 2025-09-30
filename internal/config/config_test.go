@@ -282,12 +282,12 @@ func TestConfigStructs(t *testing.T) {
 				APIKey:     "key",
 				APIKeyName: "X-API-Key",
 				APIKeyIn:   "header",
-				Headers: map[string]string{
-					"X-Custom": "value",
+				Headers: HeadersConfig{
+					{Header: HeaderConfig{Name: "X-Custom", Value: "value"}},
 				},
 			},
-			Headers: map[string]string{
-				"User-Agent": "Test/1.0",
+			Headers: HeadersConfig{
+				{Header: HeaderConfig{Name: "User-Agent", Value: "Test/1.0"}},
 			},
 		},
 		Security: SecurityConfig{

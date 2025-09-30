@@ -90,16 +90,16 @@ func TestLoadConfig_CrossrefYAML(t *testing.T) {
 	}
 
 	// Test headers
-	if config.OpenAPI.Headers["User-Agent"] != "MCPify/1.0.0" {
-		t.Errorf("Expected User-Agent 'MCPify/1.0.0', got '%s'", config.OpenAPI.Headers["User-Agent"])
+	if config.OpenAPI.Headers.GetValue("User-Agent") != "MCPify/1.0.0" {
+		t.Errorf("Expected User-Agent 'MCPify/1.0.0', got '%s'", config.OpenAPI.Headers.GetValue("User-Agent"))
 	}
 
-	if config.OpenAPI.Headers["Accept"] != "application/vnd.oai.openapi+json" {
-		t.Errorf("Expected Accept 'application/vnd.oai.openapi+json', got '%s'", config.OpenAPI.Headers["Accept"])
+	if config.OpenAPI.Headers.GetValue("Accept") != "application/vnd.oai.openapi+json" {
+		t.Errorf("Expected Accept 'application/vnd.oai.openapi+json', got '%s'", config.OpenAPI.Headers.GetValue("Accept"))
 	}
 
-	if config.OpenAPI.Headers["Content-Type"] != "application/json" {
-		t.Errorf("Expected Content-Type 'application/json', got '%s'", config.OpenAPI.Headers["Content-Type"])
+	if config.OpenAPI.Headers.GetValue("Content-Type") != "application/json" {
+		t.Errorf("Expected Content-Type 'application/json', got '%s'", config.OpenAPI.Headers.GetValue("Content-Type"))
 	}
 
 	// Test exclude paths
@@ -180,8 +180,8 @@ func TestLoadConfig_MuseYAML(t *testing.T) {
 	}
 
 	// Test custom auth headers
-	if config.OpenAPI.Auth.Headers["X-Custom-Auth"] != "custom-value" {
-		t.Errorf("Expected X-Custom-Auth 'custom-value', got '%s'", config.OpenAPI.Auth.Headers["X-Custom-Auth"])
+	if config.OpenAPI.Auth.Headers.GetValue("X-Custom-Auth") != "custom-value" {
+		t.Errorf("Expected X-Custom-Auth 'custom-value', got '%s'", config.OpenAPI.Auth.Headers.GetValue("X-Custom-Auth"))
 	}
 
 	// Test validation
@@ -241,8 +241,8 @@ func TestLoadConfig_SampleJSON(t *testing.T) {
 	}
 
 	// Test custom auth headers
-	if config.OpenAPI.Auth.Headers["X-Custom-Auth"] != "custom-value" {
-		t.Errorf("Expected X-Custom-Auth 'custom-value', got '%s'", config.OpenAPI.Auth.Headers["X-Custom-Auth"])
+	if config.OpenAPI.Auth.Headers.GetValue("X-Custom-Auth") != "custom-value" {
+		t.Errorf("Expected X-Custom-Auth 'custom-value', got '%s'", config.OpenAPI.Auth.Headers.GetValue("X-Custom-Auth"))
 	}
 
 	// Test include paths (specific to sample.json)

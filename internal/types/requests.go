@@ -136,5 +136,5 @@ type APITool struct {
 	Path        string
 	Parameters  []OpenAPIParameter
 	RequestBody *OpenAPIRequestBody
-	Handler     func(params map[string]interface{}) (interface{}, error)
+	Handler     func(params map[string]interface{}, headers map[string]string) (interface{}, error)
 }
