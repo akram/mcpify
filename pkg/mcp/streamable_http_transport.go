@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"mcpify/internal/config"
 	"mcpify/internal/types"
 )
 
@@ -207,16 +208,17 @@ func (t *StreamableHTTPTransport) handlePOST(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Step 4: Extract headers for dynamic header forwarding
-	headers := make(map[string]string)
-	for name, values := range r.Header {
-		if len(values) > 0 {
-			headers[name] = values[0] // Take first value
-		}
-	}
+	// Step 4: Create request context for dynamic header forwarding
+	requestContext := config.NewRequestContextFromHTTP(
+		r.Header,
+		r.URL.Query(),
+		r.Form,
+		r.Method,
+		r.URL.Path,
+	)
 
 	// Step 5: Process the request through the MCP server
-	response := t.mcpServer.HandleRequest(mcpReq, headers)
+	response := t.mcpServer.HandleRequest(mcpReq, requestContext)
 
 	// Step 6: Choose response format based on client preferences and request type
 	if strings.Contains(accept, "text/event-stream") && t.shouldStream(&mcpReq) {

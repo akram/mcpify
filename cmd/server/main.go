@@ -139,9 +139,9 @@ func startHTTPServerWithConfig(server *mcp.Server, cfg *config.Config) {
 func registerAPITools(server *mcp.Server, apiTools []types.APITool, apiHandler *handlers.APIHandler) {
 	for _, tool := range apiTools {
 		// Create tool handler
-		handler := func(tool types.APITool) func(params map[string]interface{}, headers map[string]string) (interface{}, error) {
-			return func(params map[string]interface{}, headers map[string]string) (interface{}, error) {
-				return apiHandler.HandleAPICall(tool, params, headers)
+		handler := func(tool types.APITool) func(params map[string]interface{}, requestContext config.RequestContext) (interface{}, error) {
+			return func(params map[string]interface{}, requestContext config.RequestContext) (interface{}, error) {
+				return apiHandler.HandleAPICall(tool, params, requestContext)
 			}
 		}(tool)
 

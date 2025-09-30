@@ -17,8 +17,9 @@ import (
 
 // Parser handles OpenAPI specification parsing and tool generation
 type Parser struct {
-	config *config.OpenAPIConfig
-	client *http.Client
+	config    *config.OpenAPIConfig
+	client    *http.Client
+	evaluator *config.RequestEvaluator
 }
 
 // NewParser creates a new OpenAPI parser
@@ -28,6 +29,7 @@ func NewParser(cfg *config.OpenAPIConfig) *Parser {
 		client: &http.Client{
 			Timeout: cfg.Timeout,
 		},
+		evaluator: config.NewRequestEvaluator(),
 	}
 }
 
@@ -280,10 +282,25 @@ func (p *Parser) addAuthHeaders(req *http.Request) {
 	}
 }
 
-// evaluateHeaders evaluates dynamic headers using the header evaluator
+// evaluateHeaders evaluates dynamic headers using the request evaluator
 func (p *Parser) evaluateHeaders(headers config.HeadersConfig, requestHeaders http.Header) (map[string]string, error) {
-	evaluator := config.NewHeaderEvaluator()
-	return evaluator.EvaluateHeaders(headers, requestHeaders)
+	// Create a minimal request context for OpenAPI spec fetching
+	requestContext := config.RequestContext{
+		Headers: make(map[string]string),
+		Query:   make(map[string]string),
+		Form:    make(map[string]string),
+		Method:  "GET",
+		Path:    "/",
+	}
+
+	// Convert HTTP headers to map (normalize to lowercase for case-insensitive matching)
+	for name, values := range requestHeaders {
+		if len(values) > 0 {
+			requestContext.Headers[strings.ToLower(name)] = values[0] // Take first value
+		}
+	}
+
+	return p.evaluator.EvaluateHeaders(headers, requestContext)
 }
 
 // generateTools generates MCP tools from OpenAPI specification

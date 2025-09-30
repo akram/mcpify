@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 
+	"mcpify/internal/config"
 	"mcpify/internal/types"
 )
 
@@ -84,7 +85,7 @@ type ToolSchema struct {
 	InputSchema map[string]interface{}
 }
 
-type ToolHandler func(params map[string]interface{}, headers map[string]string) (interface{}, error)
+type ToolHandler func(params map[string]interface{}, requestContext config.RequestContext) (interface{}, error)
 
 // Transport defines the interface for different transport mechanisms
 type Transport interface {
@@ -183,7 +184,7 @@ func categorizeToolError(err error) (int, string) {
 	return ErrorCodeToolExecutionFailed, "Tool execution failed"
 }
 
-func (s *Server) HandleRequest(req types.MCPRequest, headers map[string]string) types.MCPResponse {
+func (s *Server) HandleRequest(req types.MCPRequest, requestContext config.RequestContext) types.MCPResponse {
 	response := types.MCPResponse{
 		JSONRPC: "2.0",
 		ID:      req.ID,
@@ -239,7 +240,7 @@ func (s *Server) HandleRequest(req types.MCPRequest, headers map[string]string) 
 			return response
 		}
 
-		result, err := handler(params.Arguments, headers)
+		result, err := handler(params.Arguments, requestContext)
 		if err != nil {
 			errorCode, errorMessage := categorizeToolError(err)
 
@@ -319,7 +320,7 @@ func (st *StdioTransport) Start() error {
 			continue
 		}
 
-		response := st.server.HandleRequest(req, make(map[string]string))
+		response := st.server.HandleRequest(req, config.RequestContext{})
 		st.writeResponse(response)
 	}
 

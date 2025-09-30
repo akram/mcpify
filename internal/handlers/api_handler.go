@@ -16,8 +16,9 @@ import (
 
 // APIHandler handles HTTP requests to external APIs
 type APIHandler struct {
-	config *config.OpenAPIConfig
-	client *http.Client
+	config    *config.OpenAPIConfig
+	client    *http.Client
+	evaluator *config.RequestEvaluator
 }
 
 // NewAPIHandler creates a new API handler
@@ -27,11 +28,12 @@ func NewAPIHandler(cfg *config.OpenAPIConfig) *APIHandler {
 		client: &http.Client{
 			Timeout: cfg.Timeout,
 		},
+		evaluator: config.NewRequestEvaluator(),
 	}
 }
 
 // HandleAPICall handles an API call based on the tool configuration
-func (h *APIHandler) HandleAPICall(tool types.APITool, params map[string]interface{}, headers map[string]string) (interface{}, error) {
+func (h *APIHandler) HandleAPICall(tool types.APITool, params map[string]interface{}, requestContext config.RequestContext) (interface{}, error) {
 	// Build the request URL
 	requestURL, err := h.buildRequestURL(tool, params)
 	if err != nil {
@@ -45,16 +47,11 @@ func (h *APIHandler) HandleAPICall(tool types.APITool, params map[string]interfa
 	}
 
 	// Add authentication headers
-	h.addAuthHeaders(req, headers)
+	h.addAuthHeaders(req, requestContext)
 
 	// Add custom headers (static and dynamic)
 	// Convert headers map to http.Header for evaluation
-	requestHeaders := make(http.Header)
-	for name, value := range headers {
-		requestHeaders.Set(name, value)
-	}
-
-	evaluatedHeaders, err := h.evaluateHeaders(h.config.Headers, requestHeaders)
+	evaluatedHeaders, err := h.evaluator.EvaluateHeaders(h.config.Headers, requestContext)
 	if err != nil {
 		return nil, fmt.Errorf("failed to evaluate headers: %w", err)
 	}
@@ -223,7 +220,7 @@ func (h *APIHandler) createRequest(tool types.APITool, requestURL string, params
 }
 
 // addAuthHeaders adds authentication headers to the request
-func (h *APIHandler) addAuthHeaders(req *http.Request, headers map[string]string) {
+func (h *APIHandler) addAuthHeaders(req *http.Request, requestContext config.RequestContext) {
 	switch h.config.Auth.Type {
 	case "bearer":
 		if h.config.Auth.Token != "" {
@@ -240,13 +237,7 @@ func (h *APIHandler) addAuthHeaders(req *http.Request, headers map[string]string
 	}
 
 	// Add custom auth headers (static and dynamic)
-	// Convert headers map to http.Header for evaluation
-	requestHeaders := make(http.Header)
-	for name, value := range headers {
-		requestHeaders.Set(name, value)
-	}
-
-	evaluatedAuthHeaders, err := h.evaluateHeaders(h.config.Auth.Headers, requestHeaders)
+	evaluatedAuthHeaders, err := h.evaluator.EvaluateHeaders(h.config.Auth.Headers, requestContext)
 	if err != nil {
 		// Log error but continue - don't fail the request
 		// TODO: Add proper logging
@@ -256,10 +247,4 @@ func (h *APIHandler) addAuthHeaders(req *http.Request, headers map[string]string
 			req.Header.Set(name, value)
 		}
 	}
-}
-
-// evaluateHeaders evaluates dynamic headers using the header evaluator
-func (h *APIHandler) evaluateHeaders(headers config.HeadersConfig, requestHeaders http.Header) (map[string]string, error) {
-	evaluator := config.NewHeaderEvaluator()
-	return evaluator.EvaluateHeaders(headers, requestHeaders)
 }
