@@ -304,7 +304,7 @@ type RateLimitingConfig struct {
 func Default() *Config {
 	return &Config{
 		Server: ServerConfig{
-			Transport: "stdio",
+			Transport: "http",
 			HTTP: HTTPConfig{
 				Host:           "127.0.0.1",
 				Port:           9090,
