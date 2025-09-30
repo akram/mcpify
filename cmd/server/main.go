@@ -23,14 +23,14 @@ import (
 func main() {
 	// Parse command line flags with combined long/short form help
 	transport := flag.String("transport", "", "Transport method (stdio, http)")
-	port := flag.Int("port", 9090, "Port for HTTP transport")
+	port := flag.Int("port", 0, "Port for HTTP transport")
 	host := flag.String("host", "", "Host for HTTP transport")
 	configPath := flag.String("config", "", "Path to configuration file")
 	specPath := flag.String("spec", "", "Path to OpenAPI specification (local file or URL)")
 
 	// Add short flag aliases
 	flag.StringVar(transport, "t", "", "Transport method (stdio, http)")
-	flag.IntVar(port, "p", 9090, "Port for HTTP transport")
+	flag.IntVar(port, "p", 0, "Port for HTTP transport")
 	flag.StringVar(host, "h", "", "Host for HTTP transport")
 	flag.StringVar(configPath, "c", "", "Path to configuration file")
 	flag.StringVar(specPath, "s", "", "Path to OpenAPI specification (local file or URL)")
@@ -43,7 +43,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "  -h, --host string\n")
 		fmt.Fprintf(os.Stderr, "        Host for HTTP transport\n")
 		fmt.Fprintf(os.Stderr, "  -p, --port int\n")
-		fmt.Fprintf(os.Stderr, "        Port for HTTP transport (default: 9090)\n")
+		fmt.Fprintf(os.Stderr, "        Port for HTTP transport\n")
 		fmt.Fprintf(os.Stderr, "  -s, --spec string\n")
 		fmt.Fprintf(os.Stderr, "        Path to OpenAPI specification (local file or URL)\n")
 		fmt.Fprintf(os.Stderr, "  -t, --transport string\n")
