@@ -143,7 +143,7 @@ jobs:
       run: go mod download
       
     - name: Run Gosec Security Scanner
-      uses: securecodewarrior/github-action-gosec@master
+      uses: securego/gosec@master
       with:
         args: '-fmt sarif -out gosec.sarif ./...'
         
