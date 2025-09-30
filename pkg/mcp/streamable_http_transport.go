@@ -12,6 +12,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -44,6 +45,7 @@ type StreamableHTTPConfig struct {
 	MaxConnections int           // Maximum concurrent connections allowed
 	CORSEnabled    bool          // Whether to enable CORS headers
 	CORSOrigins    []string      // Allowed origins for CORS requests
+	MaxFormSize    int64         // Maximum form data size in bytes for dynamic header extraction (default: 1MB)
 }
 
 // NewStreamableHTTPTransport creates a new MCP-compliant HTTP transport instance
@@ -61,6 +63,7 @@ func NewStreamableHTTPTransport(mcpServer *Server, config *StreamableHTTPConfig)
 			MaxConnections: 100,                                                        // Reasonable connection limit
 			CORSEnabled:    true,                                                       // Enable CORS for web clients
 			CORSOrigins:    []string{"http://localhost:3000", "http://127.0.0.1:3000"}, // Restrictive defaults for development
+			MaxFormSize:    1 << 20,                                                    // 1MB max form size for dynamic header extraction
 		}
 	}
 
@@ -209,10 +212,33 @@ func (t *StreamableHTTPTransport) handlePOST(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Step 4: Create request context for dynamic header forwarding
+	// Check if form data should be parsed based on size limits
+	var formData url.Values
+	contentType := r.Header.Get("Content-Type")
+	if strings.Contains(contentType, "application/x-www-form-urlencoded") || strings.Contains(contentType, "multipart/form-data") {
+		if r.ContentLength > 0 && r.ContentLength <= t.config.MaxFormSize {
+			// Parse form data within size limits
+			if err := r.ParseForm(); err != nil {
+				log.Printf("Warning: Failed to parse form data: %v", err)
+				formData = make(url.Values) // Empty form data
+			} else {
+				formData = r.Form
+			}
+		} else if r.ContentLength > t.config.MaxFormSize {
+			log.Printf("Warning: Form data too large (%d bytes > %d bytes), skipping form parsing for dynamic header extraction",
+				r.ContentLength, t.config.MaxFormSize)
+			formData = make(url.Values) // Empty form data
+		} else {
+			formData = r.Form // Use existing form data if any
+		}
+	} else {
+		formData = r.Form // Use existing form data if any
+	}
+
 	requestContext := config.NewRequestContextFromHTTP(
 		r.Header,
 		r.URL.Query(),
-		r.Form,
+		formData,
 		r.Method,
 		r.URL.Path,
 	)
