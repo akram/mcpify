@@ -249,6 +249,7 @@ type OpenAPIConfig struct {
 	ToolPrefix   string        `yaml:"tool_prefix" json:"tool_prefix"`
 	ExcludePaths []string      `yaml:"exclude_paths" json:"exclude_paths"`
 	IncludePaths []string      `yaml:"include_paths" json:"include_paths"`
+	Debug        bool          `yaml:"debug" json:"debug"`
 }
 
 // UnmarshalJSON implements custom JSON unmarshaling for OpenAPIConfig
@@ -327,6 +328,7 @@ func Default() *Config {
 			Timeout:    30 * time.Second,
 			MaxRetries: 3,
 			ToolPrefix: "",
+			Debug:      false,
 			Auth: AuthConfig{
 				Type:    "none",
 				Headers: HeadersConfig{},

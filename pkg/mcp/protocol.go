@@ -211,6 +211,7 @@ func (s *Server) HandleRequest(req types.MCPRequest, requestContext config.Reque
 				InputSchema: schema.InputSchema,
 			}
 			tools = append(tools, tool)
+
 		}
 		response.Result = types.ListToolsResult{Tools: tools}
 	case "notifications/initialized":

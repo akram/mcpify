@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -34,6 +35,14 @@ func NewAPIHandler(cfg *config.OpenAPIConfig) *APIHandler {
 
 // HandleAPICall handles an API call based on the tool configuration
 func (h *APIHandler) HandleAPICall(tool types.APITool, params map[string]interface{}, requestContext config.RequestContext) (interface{}, error) {
+	// Log tool and parameters for debugging
+	if h.config.Debug {
+		log.Printf("DEBUG: Tool: %s (%s %s)", tool.Name, tool.Method, tool.Path)
+		log.Printf("DEBUG: Tool description: %s", tool.Description)
+		log.Printf("DEBUG: Parameters received: %+v", params)
+		log.Printf("DEBUG: Request context: %+v", requestContext)
+	}
+
 	// Build the request URL
 	requestURL, err := h.buildRequestURL(tool, params)
 	if err != nil {
@@ -60,14 +69,35 @@ func (h *APIHandler) HandleAPICall(tool types.APITool, params map[string]interfa
 		req.Header.Set(name, value)
 	}
 
+	// Log request details for debugging
+	if h.config.Debug {
+		log.Printf("DEBUG: Making %s request to: %s", req.Method, req.URL.String())
+		log.Printf("DEBUG: Request headers: %+v", req.Header)
+		if req.Body != nil {
+			// Read the body to log it, then recreate it
+			bodyBytes, _ := io.ReadAll(req.Body)
+			log.Printf("DEBUG: Request body: %s", string(bodyBytes))
+			req.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+		}
+	}
+
 	// Make the request with retries
 	var resp *http.Response
 	for attempt := 0; attempt <= h.config.MaxRetries; attempt++ {
+		if h.config.Debug && attempt > 0 {
+			log.Printf("DEBUG: Retry attempt %d/%d", attempt, h.config.MaxRetries)
+		}
 		resp, err = h.client.Do(req)
 		if err == nil {
+			if h.config.Debug && attempt > 0 {
+				log.Printf("DEBUG: Request succeeded on attempt %d", attempt+1)
+			}
 			break
 		}
 		if attempt < h.config.MaxRetries {
+			if h.config.Debug {
+				log.Printf("DEBUG: Request failed (attempt %d): %v, retrying in %d seconds", attempt+1, err, attempt+1)
+			}
 			time.Sleep(time.Duration(attempt+1) * time.Second)
 		}
 	}
@@ -85,6 +115,13 @@ func (h *APIHandler) HandleAPICall(tool types.APITool, params map[string]interfa
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
+	// Log response details for debugging
+	if h.config.Debug {
+		log.Printf("DEBUG: Response status: %d", resp.StatusCode)
+		log.Printf("DEBUG: Response headers: %+v", resp.Header)
+		log.Printf("DEBUG: Response body: %s", string(body))
+	}
+
 	// Handle response based on status code
 	if resp.StatusCode >= 400 {
 		return nil, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
@@ -95,14 +132,22 @@ func (h *APIHandler) HandleAPICall(tool types.APITool, params map[string]interfa
 	if len(body) > 0 {
 		// Try to parse as JSON
 		if err := json.Unmarshal(body, &result); err != nil {
-			// If not JSON, return as string
+			// If not JSON, return as string - this is valid for APIs that return plain text
 			result = string(body)
+		}
+	}
+
+	// Convert headers to a serializable map
+	headers := make(map[string]string)
+	for name, values := range resp.Header {
+		if len(values) > 0 {
+			headers[name] = values[0] // Take the first value
 		}
 	}
 
 	return map[string]interface{}{
 		"status_code": resp.StatusCode,
-		"headers":     resp.Header,
+		"headers":     headers,
 		"body":        result,
 	}, nil
 }
@@ -240,8 +285,7 @@ func (h *APIHandler) addAuthHeaders(req *http.Request, requestContext config.Req
 	evaluatedAuthHeaders, err := h.evaluator.EvaluateHeaders(h.config.Auth.Headers, requestContext)
 	if err != nil {
 		// Log error but continue - don't fail the request
-		// TODO: Add proper logging
-		fmt.Printf("Warning: failed to evaluate auth headers: %v\n", err)
+		log.Printf("Warning: failed to evaluate auth headers: %v", err)
 	} else {
 		for name, value := range evaluatedAuthHeaders {
 			req.Header.Set(name, value)

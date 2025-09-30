@@ -3,6 +3,7 @@ package openapi
 import (
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"regexp"
@@ -35,13 +36,13 @@ func NewParser(cfg *config.OpenAPIConfig) *Parser {
 
 // ParseSpec parses an OpenAPI specification and returns generated tools
 func (p *Parser) ParseSpec() ([]types.APITool, error) {
-	fmt.Printf("Starting to parse OpenAPI spec\n")
+	log.Printf("Starting to parse OpenAPI spec")
 	// Load OpenAPI spec
 	spec, err := p.loadSpec()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load OpenAPI spec: %w", err)
 	}
-	fmt.Printf("Successfully loaded spec, starting tool generation\n")
+	log.Printf("Successfully loaded spec, starting tool generation")
 
 	// Generate tools from spec
 	tools, err := p.generateTools(spec)
@@ -57,7 +58,7 @@ func (p *Parser) loadSpec() (*openapi3.T, error) {
 	var content []byte
 	var err error
 
-	fmt.Printf("Loading OpenAPI spec from: %s\n", p.config.SpecPath)
+	log.Printf("Loading OpenAPI spec from: %s", p.config.SpecPath)
 
 	// Check if spec path is a URL
 	if strings.HasPrefix(p.config.SpecPath, "http://") || strings.HasPrefix(p.config.SpecPath, "https://") {
@@ -70,39 +71,39 @@ func (p *Parser) loadSpec() (*openapi3.T, error) {
 		return nil, err
 	}
 
-	fmt.Printf("Successfully loaded spec, content length: %d bytes\n", len(content))
+	log.Printf("Successfully loaded spec, content length: %d bytes", len(content))
 
 	// Check if it's Swagger 2.0 first
 	var swagger2Spec openapi2.T
 	swaggerErr := swagger2Spec.UnmarshalJSON(content)
-	fmt.Printf("Swagger 2.0 unmarshal error: %v\n", swaggerErr)
-	fmt.Printf("Swagger version: %s\n", swagger2Spec.Swagger)
+	log.Printf("Swagger 2.0 unmarshal error: %v", swaggerErr)
+	log.Printf("Swagger version: %s", swagger2Spec.Swagger)
 
 	var spec *openapi3.T
 	if swaggerErr == nil && swagger2Spec.Swagger == "2.0" {
-		fmt.Printf("Detected Swagger 2.0 spec, converting to OpenAPI 3.x\n")
+		log.Printf("Detected Swagger 2.0 spec, converting to OpenAPI 3.x")
 		// Convert Swagger 2.0 to OpenAPI 3.x
 		spec, err = p.convertSwagger2ToOpenAPI3(&swagger2Spec)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert Swagger 2.0 to OpenAPI 3.x: %w", err)
 		}
-		fmt.Printf("Swagger 2.0 conversion succeeded\n")
+		log.Printf("Swagger 2.0 conversion succeeded")
 	} else {
-		fmt.Printf("Trying to parse as OpenAPI 3.x\n")
+		log.Printf("Trying to parse as OpenAPI 3.x")
 		// Try to parse as OpenAPI 3.x
 		loader := openapi3.NewLoader()
 		loader.IsExternalRefsAllowed = true
 
 		spec, err = loader.LoadFromData(content)
 		if err != nil {
-			fmt.Printf("OpenAPI 3.x parsing failed: %v\n", err)
+			log.Printf("OpenAPI 3.x parsing failed: %v", err)
 			return nil, fmt.Errorf("failed to parse OpenAPI spec: %w", err)
 		}
-		fmt.Printf("OpenAPI 3.x parsing succeeded\n")
+		log.Printf("OpenAPI 3.x parsing succeeded")
 	}
 
 	// Skip validation for converted specs
-	fmt.Printf("Skipping validation for spec\n")
+	log.Printf("Skipping validation for spec")
 	// if err := spec.Validate(loader.Context); err != nil {
 	//	return nil, fmt.Errorf("OpenAPI spec validation failed: %w", err)
 	// }
@@ -112,7 +113,7 @@ func (p *Parser) loadSpec() (*openapi3.T, error) {
 
 // convertSwagger2ToOpenAPI3 converts a Swagger 2.0 spec to OpenAPI 3.x
 func (p *Parser) convertSwagger2ToOpenAPI3(swagger2 *openapi2.T) (*openapi3.T, error) {
-	fmt.Printf("Converting Swagger 2.0 spec with title: %s, version: %s\n", swagger2.Info.Title, swagger2.Info.Version)
+	log.Printf("Converting Swagger 2.0 spec with title: %s, version: %s", swagger2.Info.Title, swagger2.Info.Version)
 	// Create a basic OpenAPI 3.x spec
 	spec := &openapi3.T{
 		OpenAPI: "3.0.0",
@@ -124,7 +125,7 @@ func (p *Parser) convertSwagger2ToOpenAPI3(swagger2 *openapi2.T) (*openapi3.T, e
 	}
 
 	// Convert paths
-	fmt.Printf("Converting %d paths\n", len(swagger2.Paths))
+	log.Printf("Converting %d paths", len(swagger2.Paths))
 	for path, pathItem := range swagger2.Paths {
 		openapi3PathItem := &openapi3.PathItem{}
 
@@ -148,13 +149,13 @@ func (p *Parser) convertSwagger2ToOpenAPI3(swagger2 *openapi2.T) (*openapi3.T, e
 		spec.Paths.Set(path, openapi3PathItem)
 	}
 
-	fmt.Printf("Conversion completed, returning spec\n")
+	log.Printf("Conversion completed, returning spec")
 	return spec, nil
 }
 
 // convertOperation converts a Swagger 2.0 operation to OpenAPI 3.x
 func (p *Parser) convertOperation(op *openapi2.Operation) *openapi3.Operation {
-	fmt.Printf("Converting operation: %s\n", op.OperationID)
+	log.Printf("Converting operation: %s", op.OperationID)
 	operation := &openapi3.Operation{
 		OperationID: op.OperationID,
 		Summary:     op.Summary,
@@ -163,28 +164,64 @@ func (p *Parser) convertOperation(op *openapi2.Operation) *openapi3.Operation {
 	}
 
 	// Convert parameters
-	fmt.Printf("Converting %d parameters\n", len(op.Parameters))
+	log.Printf("Converting %d parameters", len(op.Parameters))
 	for _, param := range op.Parameters {
-		openapi3Param := &openapi3.Parameter{
-			Name:        param.Name,
-			In:          param.In,
-			Description: param.Description,
-			Required:    param.Required,
-		}
+		if param.In == "body" {
+			// Convert Swagger 2.0 body parameter to OpenAPI 3.0 request body
+			if param.Schema != nil {
+				// Handle both direct schema and $ref references
+				var schemaRef *openapi3.SchemaRef
+				if param.Schema.Ref != "" {
+					// Handle $ref - convert to OpenAPI 3.0 format
+					schemaRef = &openapi3.SchemaRef{
+						Ref: param.Schema.Ref,
+					}
+				} else if param.Schema.Value != nil {
+					// Handle direct schema
+					schemaRef = &openapi3.SchemaRef{
+						Value: &openapi3.Schema{
+							Type: param.Schema.Value.Type,
+						},
+					}
+				}
 
-		// Convert schema if present
-		if param.Schema != nil {
-			openapi3Param.Schema = &openapi3.SchemaRef{
-				Value: &openapi3.Schema{
-					Type: param.Schema.Value.Type,
-				},
+				if schemaRef != nil {
+					operation.RequestBody = &openapi3.RequestBodyRef{
+						Value: &openapi3.RequestBody{
+							Description: param.Description,
+							Required:    param.Required,
+							Content: openapi3.Content{
+								"application/json": &openapi3.MediaType{
+									Schema: schemaRef,
+								},
+							},
+						},
+					}
+				}
 			}
-		}
+		} else {
+			// Convert other parameters (path, query, header)
+			openapi3Param := &openapi3.Parameter{
+				Name:        param.Name,
+				In:          param.In,
+				Description: param.Description,
+				Required:    param.Required,
+			}
 
-		operation.Parameters = append(operation.Parameters, &openapi3.ParameterRef{Value: openapi3Param})
+			// Convert schema if present
+			if param.Schema != nil && param.Schema.Value != nil {
+				openapi3Param.Schema = &openapi3.SchemaRef{
+					Value: &openapi3.Schema{
+						Type: param.Schema.Value.Type,
+					},
+				}
+			}
+
+			operation.Parameters = append(operation.Parameters, &openapi3.ParameterRef{Value: openapi3Param})
+		}
 	}
 
-	fmt.Printf("Operation conversion completed\n")
+	log.Printf("Operation conversion completed")
 	return operation
 }
 
@@ -274,7 +311,7 @@ func (p *Parser) addAuthHeaders(req *http.Request) {
 	if err != nil {
 		// Log error but continue - don't fail the request
 		// TODO: Add proper logging
-		fmt.Printf("Warning: failed to evaluate auth headers: %v\n", err)
+		log.Printf("Warning: failed to evaluate auth headers: %v", err)
 	} else {
 		for name, value := range evaluatedAuthHeaders {
 			req.Header.Set(name, value)
@@ -474,10 +511,140 @@ func (p *Parser) extractRequestBody(operation *openapi3.Operation) *types.OpenAP
 
 	// Convert content to interface{} for JSON serialization
 	for mediaType, content := range operation.RequestBody.Value.Content {
-		requestBody.Content[mediaType] = content
+		// Resolve schema references if present
+		if content.Schema != nil {
+			resolvedSchema := p.resolveSchemaRef(content.Schema)
+			requestBody.Content[mediaType] = map[string]interface{}{
+				"schema": resolvedSchema,
+			}
+		} else {
+			requestBody.Content[mediaType] = content
+		}
 	}
 
 	return requestBody
+}
+
+// resolveSchemaRef resolves a schema reference to its actual schema definition
+func (p *Parser) resolveSchemaRef(schemaRef *openapi3.SchemaRef) map[string]interface{} {
+	// If the schema reference has a resolved value, use it
+	if schemaRef.Value != nil {
+		return p.schemaToMap(schemaRef.Value)
+	}
+
+	// If it's just a reference without a resolved value, return the reference
+	// This handles cases where the reference couldn't be resolved
+	if schemaRef.Ref != "" {
+		return map[string]interface{}{
+			"$ref": schemaRef.Ref,
+		}
+	}
+
+	// Fallback to empty object
+	return map[string]interface{}{
+		"type": "object",
+	}
+}
+
+// schemaToMap converts an OpenAPI schema to a map for JSON serialization
+func (p *Parser) schemaToMap(schema *openapi3.Schema) map[string]interface{} {
+	result := make(map[string]interface{})
+
+	// Add basic schema properties
+	if schema.Type != nil && len(schema.Type.Slice()) > 0 {
+		types := schema.Type.Slice()
+		if len(types) == 1 {
+			result["type"] = types[0]
+		} else {
+			result["type"] = types
+		}
+	}
+	if schema.Description != "" {
+		result["description"] = schema.Description
+	}
+	if schema.Format != "" {
+		result["format"] = schema.Format
+	}
+	if schema.Example != nil {
+		result["example"] = schema.Example
+	}
+
+	// Handle array types
+	if schema.Type != nil && schema.Type.Is("array") && schema.Items != nil {
+		if schema.Items.Value != nil {
+			result["items"] = p.schemaToMap(schema.Items.Value)
+		} else if schema.Items.Ref != "" {
+			result["items"] = map[string]interface{}{
+				"$ref": schema.Items.Ref,
+			}
+		}
+	}
+
+	// Handle object properties
+	if len(schema.Properties) > 0 {
+		properties := make(map[string]interface{})
+		for propName, propRef := range schema.Properties {
+			if propRef.Value != nil {
+				properties[propName] = p.schemaToMap(propRef.Value)
+			} else if propRef.Ref != "" {
+				properties[propName] = map[string]interface{}{
+					"$ref": propRef.Ref,
+				}
+			}
+		}
+		result["properties"] = properties
+	}
+
+	// Handle required fields
+	if len(schema.Required) > 0 {
+		result["required"] = schema.Required
+	}
+
+	// Handle additional properties
+	if schema.AdditionalProperties.Schema != nil {
+		if schema.AdditionalProperties.Schema.Value != nil {
+			result["additionalProperties"] = p.schemaToMap(schema.AdditionalProperties.Schema.Value)
+		} else if schema.AdditionalProperties.Schema.Ref != "" {
+			result["additionalProperties"] = map[string]interface{}{
+				"$ref": schema.AdditionalProperties.Schema.Ref,
+			}
+		}
+	} else if schema.AdditionalProperties.Has != nil {
+		result["additionalProperties"] = *schema.AdditionalProperties.Has
+	}
+
+	// Handle enum values
+	if len(schema.Enum) > 0 {
+		result["enum"] = schema.Enum
+	}
+
+	// Handle default value
+	if schema.Default != nil {
+		result["default"] = schema.Default
+	}
+
+	// Handle minimum/maximum for numbers
+	if schema.Min != nil {
+		result["minimum"] = *schema.Min
+	}
+	if schema.Max != nil {
+		result["maximum"] = *schema.Max
+	}
+
+	// Handle minLength/maxLength for strings
+	if schema.MinLength > 0 {
+		result["minLength"] = schema.MinLength
+	}
+	if schema.MaxLength != nil {
+		result["maxLength"] = *schema.MaxLength
+	}
+
+	// Handle pattern for strings
+	if schema.Pattern != "" {
+		result["pattern"] = schema.Pattern
+	}
+
+	return result
 }
 
 // shouldExcludePath checks if a path should be excluded

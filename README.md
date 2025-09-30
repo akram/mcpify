@@ -139,6 +139,8 @@ security:
 ./mcpify [options]
 
 Options:
+  --base-url, -b string
+        Base URL for API requests (defaults to domain from spec URL)
   --config, -c string
         Path to configuration file
   --transport, -t string

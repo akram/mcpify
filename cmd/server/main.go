@@ -14,8 +14,10 @@ import (
 	"mcpify/internal/openapi"
 	"mcpify/internal/types"
 	"mcpify/pkg/mcp"
+	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -27,6 +29,8 @@ func main() {
 	host := flag.String("host", "", "Host for HTTP transport")
 	configPath := flag.String("config", "", "Path to configuration file")
 	specPath := flag.String("spec", "", "Path to OpenAPI specification (local file or URL)")
+	baseURL := flag.String("base-url", "", "Base URL for API requests (defaults to domain from spec URL)")
+	debug := flag.Bool("debug", false, "Enable debug logging for API requests and responses")
 
 	// Add short flag aliases
 	flag.StringVar(transport, "t", "", "Transport method (stdio, http)")
@@ -34,10 +38,14 @@ func main() {
 	flag.StringVar(host, "h", "", "Host for HTTP transport")
 	flag.StringVar(configPath, "c", "", "Path to configuration file")
 	flag.StringVar(specPath, "s", "", "Path to OpenAPI specification (local file or URL)")
+	flag.StringVar(baseURL, "b", "", "Base URL for API requests (defaults to domain from spec URL)")
+	flag.BoolVar(debug, "d", false, "Enable debug logging for API requests and responses")
 
 	// Customize flag usage to show both long and short forms on same line
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  -b, --base-url string\n")
+		fmt.Fprintf(os.Stderr, "        Base URL for API requests (defaults to domain from spec URL)\n")
 		fmt.Fprintf(os.Stderr, "  -c, --config string\n")
 		fmt.Fprintf(os.Stderr, "        Path to configuration file\n")
 		fmt.Fprintf(os.Stderr, "  -h, --host string\n")
@@ -86,6 +94,23 @@ func main() {
 		}
 		cfg.OpenAPI.SpecPath = *specPath
 	}
+	if *baseURL != "" {
+		if cfg.OpenAPI.BaseURL != "" && cfg.OpenAPI.BaseURL != *baseURL {
+			log.Printf("WARNING: Overriding config base_url '%s' with command line value '%s'", cfg.OpenAPI.BaseURL, *baseURL)
+		}
+		cfg.OpenAPI.BaseURL = *baseURL
+	}
+	if *debug {
+		cfg.OpenAPI.Debug = true
+	}
+
+	// Set default base URL from spec URL if not provided
+	if cfg.OpenAPI.BaseURL == "" && cfg.OpenAPI.SpecPath != "" {
+		if extractedBaseURL := extractBaseURLFromSpec(cfg.OpenAPI.SpecPath); extractedBaseURL != "" {
+			cfg.OpenAPI.BaseURL = extractedBaseURL
+			log.Printf("Using base URL extracted from spec: %s", cfg.OpenAPI.BaseURL)
+		}
+	}
 
 	// Validate final configuration
 	if err := cfg.Validate(); err != nil {
@@ -110,6 +135,16 @@ func main() {
 	// Register tools from OpenAPI specification
 	registerAPITools(server, apiTools, apiHandler)
 	log.Printf("Successfully parsed OpenAPI spec, generated %d tools", len(apiTools))
+
+	// Log configuration summary
+	log.Printf("=== MCPify Configuration Summary ===")
+	log.Printf("OpenAPI Spec: %s", cfg.OpenAPI.SpecPath)
+	log.Printf("Base URL: %s", cfg.OpenAPI.BaseURL)
+	log.Printf("Transport: %s", cfg.Server.Transport)
+	if cfg.Server.Transport == "http" {
+		log.Printf("HTTP Server: %s:%d", cfg.Server.HTTP.Host, cfg.Server.HTTP.Port)
+	}
+	log.Printf("=====================================")
 
 	// Start server based on transport
 	switch cfg.Server.Transport {
@@ -221,17 +256,50 @@ func generateInputSchema(tool types.APITool) map[string]interface{} {
 
 	// Add request body if present
 	if tool.RequestBody != nil {
-		properties["body"] = map[string]interface{}{
-			"type":        "object",
-			"description": "Request body data",
+		// Use the actual request body schema from OpenAPI spec
+		if tool.RequestBody.Content != nil {
+			if jsonContent, exists := tool.RequestBody.Content["application/json"]; exists {
+				// Check if this is a resolved schema (from our new schema resolution)
+				if contentMap, ok := jsonContent.(map[string]interface{}); ok {
+					if schema, hasSchema := contentMap["schema"]; hasSchema {
+						// Use the resolved schema
+						properties["body"] = schema
+					} else {
+						// Fallback to the content itself
+						properties["body"] = jsonContent
+					}
+				} else {
+					// Fallback to the content itself
+					properties["body"] = jsonContent
+				}
+			} else {
+				// Fallback to generic object if no JSON content type found
+				properties["body"] = map[string]interface{}{
+					"type":        "object",
+					"description": "Request body data",
+				}
+			}
+		} else {
+			// Fallback to generic object if no content defined
+			properties["body"] = map[string]interface{}{
+				"type":        "object",
+				"description": "Request body data",
+			}
+		}
+
+		// Add body to required fields if the request body is required
+		if tool.RequestBody.Required {
+			required = append(required, "body")
 		}
 	}
 
-	return map[string]interface{}{
+	finalSchema := map[string]interface{}{
 		"type":       "object",
 		"properties": properties,
 		"required":   required,
 	}
+
+	return finalSchema
 }
 
 func getParameterType(param types.OpenAPIParameter) string {
@@ -250,4 +318,35 @@ func getParameterType(param types.OpenAPIParameter) string {
 	}
 
 	return paramType
+}
+
+// extractBaseURLFromSpec extracts the base URL (domain) from a spec URL
+// For example: http://localhost:8080/swagger -> http://localhost:8080
+func extractBaseURLFromSpec(specPath string) string {
+	// Only process HTTP/HTTPS URLs
+	if !strings.HasPrefix(specPath, "http://") && !strings.HasPrefix(specPath, "https://") {
+		return ""
+	}
+
+	// Parse the URL
+	parsedURL, err := url.Parse(specPath)
+	if err != nil {
+		return ""
+	}
+
+	// Reconstruct the base URL with scheme and host
+	// Only include port if it's not the default port
+	if parsedURL.Port() != "" {
+		// Check if it's a non-default port
+		if (parsedURL.Scheme == "http" && parsedURL.Port() != "80") ||
+			(parsedURL.Scheme == "https" && parsedURL.Port() != "443") {
+			baseURL := fmt.Sprintf("%s://%s:%s", parsedURL.Scheme, parsedURL.Hostname(), parsedURL.Port())
+			return baseURL
+		}
+	}
+
+	// Use hostname without port for default ports
+	baseURL := fmt.Sprintf("%s://%s", parsedURL.Scheme, parsedURL.Hostname())
+
+	return baseURL
 }
