@@ -11,7 +11,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
 )
 
 func TestStreamableHTTPTransport_FormSizeLimits(t *testing.T) {
@@ -99,13 +98,22 @@ func TestStreamableHTTPTransport_FormSizeLimits(t *testing.T) {
 						if err != nil {
 							t.Fatalf("Failed to create form file: %v", err)
 						}
-						fileWriter.Write([]byte(value))
+						_, err = fileWriter.Write([]byte(value))
+						if err != nil {
+							t.Fatalf("Failed to write to form file: %v", err)
+						}
 					} else {
 						// Create a regular field
-						writer.WriteField(key, value)
+						err := writer.WriteField(key, value)
+						if err != nil {
+							t.Fatalf("Failed to write form field: %v", err)
+						}
 					}
 				}
-				writer.Close()
+				err := writer.Close()
+				if err != nil {
+					t.Fatalf("Failed to close multipart writer: %v", err)
+				}
 
 				body = &buf
 				contentType = writer.FormDataContentType()
@@ -138,7 +146,11 @@ func TestStreamableHTTPTransport_FormSizeLimits(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to send request: %v", err)
 			}
-			defer resp.Body.Close()
+			defer func() {
+				if err := resp.Body.Close(); err != nil {
+					t.Errorf("Failed to close response body: %v", err)
+				}
+			}()
 
 			// Check status code
 			if resp.StatusCode != tt.expectedStatus {
@@ -154,11 +166,10 @@ func TestStreamableHTTPTransport_FormSizeLimits(t *testing.T) {
 	}
 }
 
-
 func TestStreamableHTTPTransport_DefaultConfig(t *testing.T) {
 	// Test that default configuration is applied correctly
 	transport := NewStreamableHTTPTransport(nil, nil)
-	
+
 	// Check that MaxFormSize is set to default value (1MB)
 	expectedMaxFormSize := int64(1 << 20) // 1MB
 	if transport.config.MaxFormSize != expectedMaxFormSize {
@@ -172,7 +183,7 @@ func TestStreamableHTTPTransport_CustomConfig(t *testing.T) {
 		MaxFormSize: 2 << 20, // 2MB
 	}
 	transport := NewStreamableHTTPTransport(nil, customConfig)
-	
+
 	// Check that MaxFormSize is set to custom value
 	expectedMaxFormSize := int64(2 << 20) // 2MB
 	if transport.config.MaxFormSize != expectedMaxFormSize {
@@ -217,7 +228,7 @@ func TestStreamableHTTPTransport_FormSizeLimitIntegration(t *testing.T) {
 			// Create form data of specified size
 			formData := url.Values{}
 			formData.Set("test_field", strings.Repeat("x", tt.formSize-20)) // -20 for field name and overhead
-			
+
 			// Create request
 			req, err := http.NewRequest("POST", server.URL+"/mcp", strings.NewReader(formData.Encode()))
 			if err != nil {
@@ -235,7 +246,11 @@ func TestStreamableHTTPTransport_FormSizeLimitIntegration(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to send request: %v", err)
 			}
-			defer resp.Body.Close()
+			defer func() {
+				if err := resp.Body.Close(); err != nil {
+					t.Errorf("Failed to close response body: %v", err)
+				}
+			}()
 
 			// Should get BadRequest because it's not valid JSON-RPC
 			if resp.StatusCode != http.StatusBadRequest {

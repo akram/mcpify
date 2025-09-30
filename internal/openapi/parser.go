@@ -13,6 +13,7 @@ import (
 	"mcpify/internal/types"
 
 	"github.com/getkin/kin-openapi/openapi2"
+	"github.com/getkin/kin-openapi/openapi2conv"
 	"github.com/getkin/kin-openapi/openapi3"
 )
 
@@ -111,118 +112,18 @@ func (p *Parser) loadSpec() (*openapi3.T, error) {
 	return spec, nil
 }
 
-// convertSwagger2ToOpenAPI3 converts a Swagger 2.0 spec to OpenAPI 3.x
+// convertSwagger2ToOpenAPI3 converts a Swagger 2.0 spec to OpenAPI 3.x using kin-openapi
 func (p *Parser) convertSwagger2ToOpenAPI3(swagger2 *openapi2.T) (*openapi3.T, error) {
 	log.Printf("Converting Swagger 2.0 spec with title: %s, version: %s", swagger2.Info.Title, swagger2.Info.Version)
-	// Create a basic OpenAPI 3.x spec
-	spec := &openapi3.T{
-		OpenAPI: "3.0.0",
-		Info: &openapi3.Info{
-			Title:   swagger2.Info.Title,
-			Version: swagger2.Info.Version,
-		},
-		Paths: &openapi3.Paths{},
+
+	// Use the official kin-openapi conversion function
+	spec, err := openapi2conv.ToV3(swagger2)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert Swagger 2.0 to OpenAPI 3.x: %w", err)
 	}
 
-	// Convert paths
-	log.Printf("Converting %d paths", len(swagger2.Paths))
-	for path, pathItem := range swagger2.Paths {
-		openapi3PathItem := &openapi3.PathItem{}
-
-		// Convert operations
-		if pathItem.Get != nil {
-			openapi3PathItem.Get = p.convertOperation(pathItem.Get)
-		}
-		if pathItem.Post != nil {
-			openapi3PathItem.Post = p.convertOperation(pathItem.Post)
-		}
-		if pathItem.Put != nil {
-			openapi3PathItem.Put = p.convertOperation(pathItem.Put)
-		}
-		if pathItem.Delete != nil {
-			openapi3PathItem.Delete = p.convertOperation(pathItem.Delete)
-		}
-		if pathItem.Patch != nil {
-			openapi3PathItem.Patch = p.convertOperation(pathItem.Patch)
-		}
-
-		spec.Paths.Set(path, openapi3PathItem)
-	}
-
-	log.Printf("Conversion completed, returning spec")
+	log.Printf("Conversion completed successfully using kin-openapi")
 	return spec, nil
-}
-
-// convertOperation converts a Swagger 2.0 operation to OpenAPI 3.x
-func (p *Parser) convertOperation(op *openapi2.Operation) *openapi3.Operation {
-	log.Printf("Converting operation: %s", op.OperationID)
-	operation := &openapi3.Operation{
-		OperationID: op.OperationID,
-		Summary:     op.Summary,
-		Description: op.Description,
-		Tags:        op.Tags,
-	}
-
-	// Convert parameters
-	log.Printf("Converting %d parameters", len(op.Parameters))
-	for _, param := range op.Parameters {
-		if param.In == "body" {
-			// Convert Swagger 2.0 body parameter to OpenAPI 3.0 request body
-			if param.Schema != nil {
-				// Handle both direct schema and $ref references
-				var schemaRef *openapi3.SchemaRef
-				if param.Schema.Ref != "" {
-					// Handle $ref - convert to OpenAPI 3.0 format
-					schemaRef = &openapi3.SchemaRef{
-						Ref: param.Schema.Ref,
-					}
-				} else if param.Schema.Value != nil {
-					// Handle direct schema
-					schemaRef = &openapi3.SchemaRef{
-						Value: &openapi3.Schema{
-							Type: param.Schema.Value.Type,
-						},
-					}
-				}
-
-				if schemaRef != nil {
-					operation.RequestBody = &openapi3.RequestBodyRef{
-						Value: &openapi3.RequestBody{
-							Description: param.Description,
-							Required:    param.Required,
-							Content: openapi3.Content{
-								"application/json": &openapi3.MediaType{
-									Schema: schemaRef,
-								},
-							},
-						},
-					}
-				}
-			}
-		} else {
-			// Convert other parameters (path, query, header)
-			openapi3Param := &openapi3.Parameter{
-				Name:        param.Name,
-				In:          param.In,
-				Description: param.Description,
-				Required:    param.Required,
-			}
-
-			// Convert schema if present
-			if param.Schema != nil && param.Schema.Value != nil {
-				openapi3Param.Schema = &openapi3.SchemaRef{
-					Value: &openapi3.Schema{
-						Type: param.Schema.Value.Type,
-					},
-				}
-			}
-
-			operation.Parameters = append(operation.Parameters, &openapi3.ParameterRef{Value: openapi3Param})
-		}
-	}
-
-	log.Printf("Operation conversion completed")
-	return operation
 }
 
 // loadFromFile loads OpenAPI spec from a local file
