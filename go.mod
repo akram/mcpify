@@ -5,7 +5,7 @@ go 1.22.5
 require (
 	github.com/PaesslerAG/jsonpath v0.1.1
 	github.com/getkin/kin-openapi v0.133.0
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.11.1
 	gopkg.in/yaml.v3 v3.0.1
 )
 
